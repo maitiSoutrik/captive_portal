@@ -1,6 +1,6 @@
 #
 # Automatically generated file. DO NOT EDIT.
-# Espressif IoT Development Framework (ESP-IDF)  Project Configuration
+# Espressif IoT Development Framework (ESP-IDF) 5.1.5 Project Configuration
 #
 CONFIG_SOC_BROWNOUT_RESET_SUPPORTED="Not determined"
 CONFIG_SOC_TWAI_BRP_DIV_SUPPORTED="Not determined"
@@ -347,13 +347,27 @@ CONFIG_PARTITION_TABLE_MD5=y
 # end of Partition Table
 
 #
-# Example Configuration
+# App WiFi Configuration
 #
-CONFIG_ESP_WIFI_SSID="esp32_ssid"
-CONFIG_ESP_WIFI_PASSWORD="esp32_pwd"
-CONFIG_ESP_MAX_STA_CONN=4
-CONFIG_ESP_TEST_VALUE=100
-# end of Example Configuration
+CONFIG_ESP_WIFI_AP_SSID="esp32_ssid"
+CONFIG_ESP_WIFI_AP_PASSWORD="esp32_pwd"
+CONFIG_ESP_MAX_AP_STA_CONN=4
+CONFIG_ESP_WIFI_SSID="Warning"
+CONFIG_ESP_WIFI_PASSWORD="NoDeathNoFear@24"
+# CONFIG_ESP_WPA3_SAE_PWE_HUNT_AND_PECK is not set
+# CONFIG_ESP_WPA3_SAE_PWE_HASH_TO_ELEMENT is not set
+CONFIG_ESP_WPA3_SAE_PWE_BOTH=y
+CONFIG_ESP_WIFI_PW_ID=""
+CONFIG_ESP_MAXIMUM_RETRY=5
+# CONFIG_ESP_WIFI_AUTH_OPEN is not set
+# CONFIG_ESP_WIFI_AUTH_WEP is not set
+# CONFIG_ESP_WIFI_AUTH_WPA_PSK is not set
+CONFIG_ESP_WIFI_AUTH_WPA2_PSK=y
+# CONFIG_ESP_WIFI_AUTH_WPA_WPA2_PSK is not set
+# CONFIG_ESP_WIFI_AUTH_WPA3_PSK is not set
+# CONFIG_ESP_WIFI_AUTH_WPA2_WPA3_PSK is not set
+# CONFIG_ESP_WIFI_AUTH_WAPI_PSK is not set
+# end of App WiFi Configuration
 
 #
 # Compiler options
