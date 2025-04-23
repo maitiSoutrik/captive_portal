@@ -23,6 +23,7 @@
 #include "dns_server.h"
 #include "app_station.h"
 #include "local_server.h"
+#include "time_sync.h"
 
 #define EXAMPLE_ESP_WIFI_AP_SSID CONFIG_ESP_WIFI_AP_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_AP_PASSWORD
@@ -141,6 +142,10 @@ void app_main(void)
 
     ESP_LOGI(TAG, "wifi_init_softap finished. SSID:'%s' password:'%s'",
              EXAMPLE_ESP_WIFI_AP_SSID, EXAMPLE_ESP_WIFI_PASS);
+
+
+
+    time_sync_init();
 
     while (1)
     {
