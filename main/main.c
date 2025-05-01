@@ -92,7 +92,7 @@ static esp_err_t http_server_ota_update_handler(httpd_req_t *req);
 static esp_err_t http_server_ota_status_handler(httpd_req_t *req);
 static esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err);
 static esp_err_t http_server_ssid_handler(httpd_req_t *req);
-
+static esp_err_t http_server_local_time_handler(httpd_req_t *req);
 
 void app_main(void)
 {
@@ -242,6 +242,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 static void start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
+    config.max_uri_handlers = 9;
     config.max_open_sockets = 13;
     config.lru_purge_enable = true;
 
@@ -354,6 +355,13 @@ static void handler_initialize(void)
             .method = HTTP_GET,
             .handler = http_server_ssid_handler,
             .user_ctx = NULL};
+    // Register Local Time Handler
+    httpd_uri_t local_time =
+        {
+            .uri = "/localTime",
+            .method = HTTP_GET,
+            .handler = http_server_local_time_handler,
+            .user_ctx = NULL};
 
     httpd_register_uri_handler(http_server_handle, &jquery_js);
     httpd_register_uri_handler(http_server_handle, &index_html);
@@ -363,6 +371,7 @@ static void handler_initialize(void)
     httpd_register_uri_handler(http_server_handle, &ota_update);
     httpd_register_uri_handler(http_server_handle, &ota_status);
     httpd_register_uri_handler(http_server_handle, &ssid);
+    httpd_register_uri_handler(http_server_handle, &local_time);
 }
 
 /*
@@ -653,6 +662,19 @@ static esp_err_t http_server_ssid_handler(httpd_req_t *req)
 
     return ESP_OK;
 }
+
+static esp_err_t http_server_local_time_handler(httpd_req_t *req)
+{
+    char local_time_json[100];
+    ESP_LOGI(TAG, "Local Time Requested");
+    sprintf(local_time_json, "{\"time\":\"%s\"}", __TIME__);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, local_time_json, strlen(local_time_json));
+
+    return ESP_OK;
+}
+
 
 // HTTP Error (404) Handler - Redirects all requests to the root page
 static esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)
