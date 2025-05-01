@@ -91,6 +91,8 @@ static esp_err_t http_server_favicon_handler(httpd_req_t *req);
 static esp_err_t http_server_ota_update_handler(httpd_req_t *req);
 static esp_err_t http_server_ota_status_handler(httpd_req_t *req);
 static esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err);
+static esp_err_t http_server_ssid_handler(httpd_req_t *req);
+
 
 void app_main(void)
 {
@@ -345,6 +347,14 @@ static void handler_initialize(void)
             .handler = http_server_ota_status_handler,
             .user_ctx = NULL};
 
+    // Register SSID Handler
+    httpd_uri_t ssid =
+        {
+            .uri = "/apSSID",
+            .method = HTTP_GET,
+            .handler = http_server_ssid_handler,
+            .user_ctx = NULL};
+
     httpd_register_uri_handler(http_server_handle, &jquery_js);
     httpd_register_uri_handler(http_server_handle, &index_html);
     httpd_register_uri_handler(http_server_handle, &app_css);
@@ -352,6 +362,7 @@ static void handler_initialize(void)
     httpd_register_uri_handler(http_server_handle, &favicon_ico);
     httpd_register_uri_handler(http_server_handle, &ota_update);
     httpd_register_uri_handler(http_server_handle, &ota_status);
+    httpd_register_uri_handler(http_server_handle, &ssid);
 }
 
 /*
@@ -627,6 +638,18 @@ static esp_err_t http_server_ota_status_handler(httpd_req_t *req)
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, ota_JSON, strlen(ota_JSON));
+
+    return ESP_OK;
+}
+
+static esp_err_t http_server_ssid_handler(httpd_req_t *req)
+{
+    char ssid_json[100];
+    ESP_LOGI(TAG, "SSID Requested");
+    sprintf(ssid_json, "{\"ssid\":\"%s\"}", EXAMPLE_ESP_WIFI_AP_SSID);
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, ssid_json, strlen(ssid_json));
 
     return ESP_OK;
 }
