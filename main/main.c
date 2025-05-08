@@ -19,11 +19,15 @@
 #include "lwip/inet.h"
 #include "esp_ota_ops.h"
 
+#include <time.h> // Include for time functions
+#include <sys/time.h> // Include for timeval
+#include <stdio.h> // Include for snprintf
 
 #include "esp_http_server.h"
 #include "dns_server.h"
 #include "app_station.h"
 #include "local_server.h"
+#include "time_sync.h"
 
 #define EXAMPLE_ESP_WIFI_AP_SSID CONFIG_ESP_WIFI_AP_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_AP_PASSWORD
@@ -93,6 +97,9 @@ static esp_err_t http_server_ota_status_handler(httpd_req_t *req);
 static esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err);
 static esp_err_t http_server_ssid_handler(httpd_req_t *req);
 static esp_err_t http_server_local_time_handler(httpd_req_t *req);
+static void get_local_time_string(char *time_str, size_t len);
+static void get_local_time_string_utc(char *time_str, size_t len);
+
 
 void app_main(void)
 {
@@ -145,7 +152,10 @@ void app_main(void)
 
     ESP_LOGI(TAG, "wifi_init_softap finished. SSID:'%s' password:'%s'",
              EXAMPLE_ESP_WIFI_AP_SSID, EXAMPLE_ESP_WIFI_PASS);
-
+    
+    
+    time_sync_init();
+    
     while (1)
     {
         http_server_monitor();
@@ -665,16 +675,41 @@ static esp_err_t http_server_ssid_handler(httpd_req_t *req)
 
 static esp_err_t http_server_local_time_handler(httpd_req_t *req)
 {
-    char local_time_json[100];
     ESP_LOGI(TAG, "Local Time Requested");
-    sprintf(local_time_json, "{\"time\":\"%s\"}", __TIME__);
+
+
+    char local_time_str[64];
+    char utc_time_str[64];
+    char local_time_json[160]; // Increased buffer size for both times
+
+    get_local_time_string(local_time_str, sizeof(local_time_str));
+    get_local_time_string_utc(utc_time_str, sizeof(utc_time_str));
+
+    snprintf(local_time_json, sizeof(local_time_json), "{\"local_time\":\"%s\",\"utc_time\":\"%s\"}", local_time_str, utc_time_str);
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, local_time_json, strlen(local_time_json));
 
+
+
     return ESP_OK;
 }
 
+static void get_local_time_string(char *time_str, size_t len)
+{
+    time_t now = time(NULL);
+    struct tm timeinfo = {0};
+    localtime_r(&now, &timeinfo);
+    strftime(time_str, len, "%Y-%m-%d %H:%M:%S", &timeinfo);
+}
+
+static void get_local_time_string_utc(char *time_str, size_t len)
+{
+    time_t now = time(NULL);
+    struct tm timeinfo = {0};
+    gmtime_r(&now, &timeinfo);
+    strftime(time_str, len, "%Y-%m-%d %H:%M:%S", &timeinfo);
+}
 
 // HTTP Error (404) Handler - Redirects all requests to the root page
 static esp_err_t http_404_error_handler(httpd_req_t *req, httpd_err_code_t err)

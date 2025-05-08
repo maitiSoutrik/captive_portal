@@ -311,15 +311,17 @@ function startLocalTimeInterval()
   setInterval(getLocalTime, 10000);
 }
 
-// Gets the Local Time
+// Gets the Local Time (HH:MM:SS only)
 // NOTE: Connect the ESP32 to the internet and the time will be updated
-function getLocalTime()
-{
+function getLocalTime() {
   $.getJSON('/localTime', function(data) {
-    // console.log(data);   // used for debugging
-    $("#local_time").text(data["time"]);
+    if (data && data["local_time"]) {
+      const timeOnly = data["local_time"].split(" ")[1]; // Directly extracts "HH:MM:SS"
+      $("#local_time").text(timeOnly);
+    }
   });
 }
+
 
 // Get the ESP32 Access Point SSID for displaying on the webpage
 function getSSID()

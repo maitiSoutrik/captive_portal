@@ -31,6 +31,15 @@ void time_sync_notification_cb(struct timeval *tv)
     ESP_LOGI(TAG, "Notification of a time synchronization event");
 }
 
+
+void configure_timezone()
+{
+    // Set timezone to Central Standard Time (Chicago) with DST rules
+    setenv("TZ", "CST6CDT,M3.2.0,M11.1.0", 1);
+    tzset();
+}
+
+
 void time_sync_init(void)
 {
     time_t now;
@@ -61,6 +70,8 @@ void time_sync_init(void)
     localtime_r(&now, &timeinfo);
     strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
     ESP_LOGI(TAG, "The current date/time in Shanghai is: %s", strftime_buf);
+    // Set timezone to Central Standard Time (Chicago)
+    configure_timezone();
 }
 
 
