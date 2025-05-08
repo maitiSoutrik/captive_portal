@@ -1,0 +1,2 @@
+idf_component_register(SRCS "app_local_server.c"
+                    INCLUDE_DIRS "include")

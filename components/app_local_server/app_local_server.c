@@ -1,5 +1,5 @@
 #include <stdio.h>
-#include "shtc3.h"
+#include "app_local_server.h"
 
 void func(void)
 {
