@@ -77,16 +77,16 @@ typedef struct{
     const char *value;
 } http_rsp_type_t;
 
-static http_rsp_type_t http_rsp_type[] = {
-    {"SSID", "SSID"},
-    {"Temperature", "Temperature"},
-    {"Humidity", "Humidity"},
-    {"Time", "Time"},
-    {"Date", "Date"},
-    {"IP", "IP"},
-    {"MAC", "MAC"},
-    {"Motion", "Motion"},
-};
+// static http_rsp_type_t http_rsp_type[] = {
+//     {"SSID", "SSID"},
+//     {"Temperature", "Temperature"},
+//     {"Humidity", "Humidity"},
+//     {"Time", "Time"},
+//     {"Date", "Date"},
+//     {"IP", "IP"},
+//     {"MAC", "MAC"},
+//     {"Motion", "Motion"},
+// };
 
 static http_server_wifi_connect_status_e g_wifi_connect_status = HTTP_WIFI_STATUS_CONNECT_NONE;
 
@@ -106,6 +106,7 @@ static esp_err_t http_server_local_time_handler(httpd_req_t *req);
 static esp_err_t http_server_get_data_handler(httpd_req_t *req);
 static void http_server_monitor(void);
 static void http_server_fw_update_reset_timer(void);
+static esp_err_t http_server_sensor_handler(httpd_req_t *req); // Add prototype for new sensor handler
 static void handler_initialize(void);
 static void start_webserver(void);
 static void get_local_time_string(char *time_str, size_t len);
@@ -127,6 +128,7 @@ static const httpd_uri_t uri_handlers[] = {
     {"/apSSID", HTTP_GET, http_server_ssid_handler,NULL},
     {"/localTime", HTTP_GET, http_server_local_time_handler,NULL},
     {"/getData", HTTP_POST, http_server_get_data_handler,NULL},
+    {"/Sensor", HTTP_GET, http_server_sensor_handler, NULL}, // Added /Sensor handler
 };
 
 
@@ -230,7 +232,7 @@ static void http_server_monitor(void)
 static void start_webserver(void)
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = URI_HANDLERS_COUNT + URI_HANDLER_MARGIN;
+    config.max_uri_handlers = URI_HANDLERS_COUNT + URI_HANDLER_MARGIN; // Reverted to use URI_HANDLERS_COUNT
     config.max_open_sockets = 13;
     config.lru_purge_enable = true;
 
@@ -238,11 +240,12 @@ static void start_webserver(void)
     if (httpd_start(&http_server_handle, &config) == ESP_OK)
     {
         // Set URI handlers
-        for (size_t i = 0; i < URI_HANDLERS_COUNT; i++)
+        for (size_t i = 0; i < URI_HANDLERS_COUNT; i++) // Restored loop
         {
             ESP_LOGI(TAG, "Registering URI handler: %s", uri_handlers[i].uri);
             httpd_register_uri_handler(http_server_handle, &uri_handlers[i]);
         }
+        handler_initialize();
         httpd_register_err_handler(http_server_handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
     }
     else
@@ -348,6 +351,13 @@ static void handler_initialize(void)
             .handler = http_server_get_data_handler,
             .user_ctx = NULL};
 
+    httpd_uri_t sensor = 
+            {
+            .uri = "/Sensor",
+            .method = HTTP_GET,
+            .handler = http_server_sensor_handler,
+            .user_ctx = NULL};
+
     httpd_register_uri_handler(http_server_handle, &jquery_js);
     httpd_register_uri_handler(http_server_handle, &index_html);
     httpd_register_uri_handler(http_server_handle, &app_css);
@@ -358,6 +368,27 @@ static void handler_initialize(void)
     httpd_register_uri_handler(http_server_handle, &ssid);
     httpd_register_uri_handler(http_server_handle, &local_time);
     httpd_register_uri_handler(http_server_handle, &get_data_handler);
+    httpd_register_uri_handler(http_server_handle, &sensor);
+}
+
+/*
+ * Sensor data handler
+ * @param req HTTP request for which the uri needs to be handled
+ * @return ESP_OK
+ */
+static esp_err_t http_server_sensor_handler(httpd_req_t *req)
+{
+    char sensor_json[100];
+    ESP_LOGI(TAG, "Sensor Data Requested");
+
+    // Prepare JSON response
+    // Assuming get_temperature() and get_humidity() return int16_t
+    snprintf(sensor_json, sizeof(sensor_json), "{\"temp\":\"%d\",\"humidity\":\"%d\"}", get_temperature(), get_humidity());
+
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, sensor_json, strlen(sensor_json));
+
+    return ESP_OK;
 }
 
 /*
