@@ -250,7 +250,7 @@ static void start_webserver(void)
     }
     else
     {
-
+        ESP_LOGE(TAG, "Failed to start web server");
     }
 }
 
