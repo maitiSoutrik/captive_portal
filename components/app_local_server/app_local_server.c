@@ -71,22 +71,10 @@ static const esp_timer_create_args_t fw_update_reset_args =
         .name = "fw_update_reset"};
 esp_timer_handle_t fw_update_reset;
 
-
 typedef struct{
     const char *key;
     const char *value;
 } http_rsp_type_t;
-
-// static http_rsp_type_t http_rsp_type[] = {
-//     {"SSID", "SSID"},
-//     {"Temperature", "Temperature"},
-//     {"Humidity", "Humidity"},
-//     {"Time", "Time"},
-//     {"Date", "Date"},
-//     {"IP", "IP"},
-//     {"MAC", "MAC"},
-//     {"Motion", "Motion"},
-// };
 
 static http_server_wifi_connect_status_e g_wifi_connect_status = HTTP_WIFI_STATUS_CONNECT_NONE;
 
@@ -107,20 +95,19 @@ static esp_err_t http_server_get_data_handler(httpd_req_t *req);
 static void http_server_monitor(void);
 static void http_server_fw_update_reset_timer(void);
 static esp_err_t http_server_sensor_handler(httpd_req_t *req); // Add prototype for new sensor handler
-static void handler_initialize(void);
 static void start_webserver(void);
 static void get_local_time_string(char *time_str, size_t len);
 static void get_local_time_string_utc(char *time_str, size_t len);
 static int16_t get_temperature(void);
 static int16_t get_humidity(void);
 bool get_data_rsp_string(char *key, char *buffer, uint16_t len);
-
+static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req);
 
 
 static const httpd_uri_t uri_handlers[] = {
-    {"/jquery.3.3.1.min.js", HTTP_GET, http_server_j_query_handler,NULL},
     {"/", HTTP_GET, http_server_index_html_handler,NULL},
     {"/app.css", HTTP_GET, http_server_app_css_handler,NULL},
+    {"/jquery-3.3.1.min.js", HTTP_GET, http_server_j_query_handler,NULL},
     {"/app.js", HTTP_GET, http_server_app_js_handler,NULL},
     {"/favicon.ico", HTTP_GET, http_server_favicon_handler,NULL},
     {"/OTAupdate", HTTP_POST, http_server_ota_update_handler,NULL},
@@ -128,11 +115,9 @@ static const httpd_uri_t uri_handlers[] = {
     {"/apSSID", HTTP_GET, http_server_ssid_handler,NULL},
     {"/localTime", HTTP_GET, http_server_local_time_handler,NULL},
     {"/getData", HTTP_POST, http_server_get_data_handler,NULL},
-    {"/Sensor", HTTP_GET, http_server_sensor_handler, NULL}, // Added /Sensor handler
+    {"/Sensor", HTTP_GET, http_server_sensor_handler, NULL},
+    {"/wifiConnect", HTTP_POST, http_server_wifi_connect_handler, NULL},
 };
-
-
-
 
 // FUNCTIONS
 bool app_local_server_init(void)
@@ -245,7 +230,6 @@ static void start_webserver(void)
             ESP_LOGI(TAG, "Registering URI handler: %s", uri_handlers[i].uri);
             httpd_register_uri_handler(http_server_handle, &uri_handlers[i]);
         }
-        handler_initialize();
         httpd_register_err_handler(http_server_handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
     }
     else
@@ -273,102 +257,6 @@ static void http_server_fw_update_reset_timer(void)
     {
         ESP_LOGI(TAG, "http_server_fw_update_reset_timer: FW Update unsuccessful");
     }
-}
-
-static void handler_initialize(void)
-{
-    // Register jQuery handler
-    httpd_uri_t jquery_js =
-        {
-            .uri = "/jquery-3.3.1.min.js",
-            .method = HTTP_GET,
-            .handler = http_server_j_query_handler,
-            .user_ctx = NULL};
-    // Register index.html handler
-    httpd_uri_t index_html =
-        {
-            .uri = "/",
-            .method = HTTP_GET,
-            .handler = http_server_index_html_handler,
-            .user_ctx = NULL};
-    // Register app.css handler
-    httpd_uri_t app_css =
-        {
-            .uri = "/app.css",
-            .method = HTTP_GET,
-            .handler = http_server_app_css_handler,
-            .user_ctx = NULL};
-    // Register app.js handler
-    httpd_uri_t app_js =
-        {
-            .uri = "/app.js",
-            .method = HTTP_GET,
-            .handler = http_server_app_js_handler,
-            .user_ctx = NULL};
-    // Register favicon.ico handler
-    httpd_uri_t favicon_ico =
-        {
-            .uri = "/favicon.ico",
-            .method = HTTP_GET,
-            .handler = http_server_favicon_handler,
-            .user_ctx = NULL};
-    // Register OTA Update Handler
-    httpd_uri_t ota_update =
-        {
-            .uri = "/OTAupdate",
-            .method = HTTP_POST,
-            .handler = http_server_ota_update_handler,
-            .user_ctx = NULL};
-
-    // Register OTA Status Handler
-    httpd_uri_t ota_status =
-        {
-            .uri = "/OTAstatus",
-            .method = HTTP_POST,
-            .handler = http_server_ota_status_handler,
-            .user_ctx = NULL};
-
-    // Register SSID Handler
-    httpd_uri_t ssid =
-        {
-            .uri = "/apSSID",
-            .method = HTTP_GET,
-            .handler = http_server_ssid_handler,
-            .user_ctx = NULL};
-    // Register Local Time Handler
-    httpd_uri_t local_time =
-        {
-            .uri = "/localTime",
-            .method = HTTP_GET,
-            .handler = http_server_local_time_handler,
-            .user_ctx = NULL};
-
-    // Register Sensor Data Handler
-    httpd_uri_t get_data_handler =
-        {
-            .uri = "/getData",
-            .method = HTTP_POST,
-            .handler = http_server_get_data_handler,
-            .user_ctx = NULL};
-
-    httpd_uri_t sensor = 
-            {
-            .uri = "/Sensor",
-            .method = HTTP_GET,
-            .handler = http_server_sensor_handler,
-            .user_ctx = NULL};
-
-    httpd_register_uri_handler(http_server_handle, &jquery_js);
-    httpd_register_uri_handler(http_server_handle, &index_html);
-    httpd_register_uri_handler(http_server_handle, &app_css);
-    httpd_register_uri_handler(http_server_handle, &app_js);
-    httpd_register_uri_handler(http_server_handle, &favicon_ico);
-    httpd_register_uri_handler(http_server_handle, &ota_update);
-    httpd_register_uri_handler(http_server_handle, &ota_status);
-    httpd_register_uri_handler(http_server_handle, &ssid);
-    httpd_register_uri_handler(http_server_handle, &local_time);
-    httpd_register_uri_handler(http_server_handle, &get_data_handler);
-    httpd_register_uri_handler(http_server_handle, &sensor);
 }
 
 /*
@@ -898,6 +786,58 @@ static int16_t get_humidity(void)
 {
     // return random number between 0 & 100
     return (rand() % 100);
+}
+
+static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
+{
+    bool isComma = false;
+    int32_t length = 0;
+    uint16_t rsp_len = 0;
+    char response[100];
+    char temp_buff[256] = {0};
+    ESP_LOGI(TAG, "Parameters Request Received");
+
+    // Read request content
+    char buf[256];
+    int ret = httpd_req_recv(req, buf, sizeof(buf) - 1);
+    if (ret <= 0)
+    {
+        ESP_LOGE(TAG, "Failed to receive request data");
+        httpd_resp_send_500(req);
+        return ESP_FAIL;
+    }
+    buf[ret] = '\0';
+
+    // Process parameters (this is a placeholder for actual processing logic)
+    ESP_LOGI(TAG, "Received parameters: %s", buf);
+
+    // Read the two headers my-connect-ssid & my-connect-pswd from the POST request
+    char ssid[64] = {0};
+    char pswd[64] = {0};
+    httpd_req_get_hdr_value_str(req, "my-connect-ssid", ssid, sizeof(ssid));
+    httpd_req_get_hdr_value_str(req, "my-connect-pswd", pswd, sizeof(pswd));
+
+    ESP_LOGI(TAG, "ssid: %s, pswd: %s", ssid, pswd);
+
+    rsp_len = snprintf(response, sizeof(response), "{\"ssid\":\"%s\",\"pswd\":\"%s\"}", ssid, pswd);
+    
+    // Send response back to client
+    httpd_resp_set_type(req, "application/json");
+    
+    esp_err_t error = httpd_resp_send(req, response, rsp_len);
+    
+    if (error != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error %d while sending params response", error);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Params response sent successfully");
+    }
+
+
+
+    return ESP_OK;
 }
 
 // HTTP Error (404) Handler - Redirects all requests to the root page
