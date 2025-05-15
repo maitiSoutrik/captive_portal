@@ -210,12 +210,13 @@ function connectWiFi()
     data: { 'timestamp': Date.now() }
   });
 
-  startWiFiConnectStatusInterval();
+  // startWiFiConnectStatusInterval();
 }
 
 // Check the Entered Connection when "Connect" button is pressed
 function checkCredentials()
 {
+  console.log("Connect Button is Pressed, now checking the Credentials");
   // console prints are used for debugging
   // console.log("Connect Button is Pressed, now checking the Credentials");
   errorList = "";
@@ -223,8 +224,6 @@ function checkCredentials()
 
   selectedSSID = $("#connect_ssid").val();
   pswd = $("#connect_pswd").val();
-  // console.log("SSID:" + selectedSSID);   // used for debugging
-
   // SSID shouldn't be blank
   if( selectedSSID == "" )
   {
