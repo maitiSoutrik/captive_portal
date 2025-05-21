@@ -24,6 +24,7 @@
 #include "dns_server.h"
 #include "time_sync.h"
 #include "nvs_storage.h"
+#include "spi_ffs_storage.h"
 
 #define EXAMPLE_ESP_WIFI_AP_SSID CONFIG_ESP_WIFI_AP_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_AP_PASSWORD
@@ -78,6 +79,11 @@ void app_main(void)
     
     
     time_sync_init();
+
+    spi_ffs_storage_init();
+
+    spi_ffs_storage_test();
+    
     
     while (1)
     {
