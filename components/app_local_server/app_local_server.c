@@ -35,6 +35,8 @@
 #define OTA_UPDATE_SUCCESSFUL (1)
 #define OTA_UPDATE_FAILED (-1)
 
+#define TAG "app_local_server"
+
 // GLOBAL VARIABLES
 
 // Embedded Files: JQuery, index.html, app.css, app.js, and favicon.ico files
@@ -51,7 +53,7 @@ extern const char favicon_ico_end[] asm("_binary_favicon_ico_end");
 extern const char root_start[] asm("_binary_root_html_start");
 extern const char root_end[] asm("_binary_root_html_end");
 
-static const char *TAG = "app_local_server";
+
 
 static char http_server_buffer[HTTP_SERVER_BUFFER_SIZE] = {0};
 
