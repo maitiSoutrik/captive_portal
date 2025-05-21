@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "nvs_storage.h"
 
 /*
  * Messages for the HTTP Monitor

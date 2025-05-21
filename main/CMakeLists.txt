@@ -4,4 +4,4 @@ idf_component_register(SRCS
                         "time_sync.c"
                         "app_station.c" 
                         INCLUDE_DIRS "include"
-                        REQUIRES app_local_server nvs_flash esp_wifi)
+                        REQUIRES app_local_server nvs_storage nvs_flash esp_wifi)

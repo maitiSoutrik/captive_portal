@@ -22,6 +22,7 @@
 
 #include "app_local_server.h"
 
+
 // DEFINES
 #define URI_HANDLER_MARGIN (1u)
 #define URI_HANDLERS_COUNT (sizeof(uri_handlers) / sizeof(uri_handlers[0]))
@@ -817,6 +818,8 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
     httpd_req_get_hdr_value_str(req, "my-connect-ssid", ssid, sizeof(ssid));
     httpd_req_get_hdr_value_str(req, "my-connect-pswd", pswd, sizeof(pswd));
 
+    nvs_storage_save_wifi_creds(ssid, pswd);
+
     ESP_LOGI(TAG, "ssid: %s, pswd: %s", ssid, pswd);
 
     rsp_len = snprintf(response, sizeof(response), "{\"ssid\":\"%s\",\"pswd\":\"%s\"}", ssid, pswd);
@@ -834,8 +837,6 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
     {
         ESP_LOGI(TAG, "Params response sent successfully");
     }
-
-
 
     return ESP_OK;
 }

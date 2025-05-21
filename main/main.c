@@ -23,6 +23,7 @@
 #include "app_station.h"
 #include "dns_server.h"
 #include "time_sync.h"
+#include "nvs_storage.h"
 
 #define EXAMPLE_ESP_WIFI_AP_SSID CONFIG_ESP_WIFI_AP_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_AP_PASSWORD
@@ -38,9 +39,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
 
 void app_main(void)
 {
-    // Initialize NVS needed by Wi-Fi
-    ESP_ERROR_CHECK(nvs_flash_init());
-
+    nvs_storage_init();
     // Initialize networking stack
     ESP_ERROR_CHECK(esp_netif_init());
 

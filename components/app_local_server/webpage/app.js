@@ -16,7 +16,7 @@ $(document).ready(function()
   startLocalTimeInterval();
   // earlier I commented out this function, but this is also important
   // for the scenarios when the user has refreshed the web page
-  getConnectInfo();
+  // getConnectInfo();
 
   // Connect Button Callback can be done in HTML code also
   $("#connect_wifi").on("click", function() {
