@@ -19,8 +19,10 @@
 #include "esp_http_server.h"
 #include <cJSON.h>
 #include <time.h>
+#include "nvs.h"
 
 #include "app_local_server.h"
+#include "app_station.h"
 
 
 // DEFINES
@@ -105,7 +107,7 @@ static int16_t get_temperature(void);
 static int16_t get_humidity(void);
 bool get_data_rsp_string(char *key, char *buffer, uint16_t len);
 static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req);
-
+static esp_err_t http_server_get_saved_station_ssid_handler(httpd_req_t *req);
 
 static const httpd_uri_t uri_handlers[] = {
     {"/", HTTP_GET, http_server_index_html_handler,NULL},
@@ -120,6 +122,7 @@ static const httpd_uri_t uri_handlers[] = {
     {"/getData", HTTP_POST, http_server_get_data_handler,NULL},
     {"/Sensor", HTTP_GET, http_server_sensor_handler, NULL},
     {"/wifiConnect", HTTP_POST, http_server_wifi_connect_handler, NULL},
+    {"/getSavedStationSSID", HTTP_GET, http_server_get_saved_station_ssid_handler, NULL},
 };
 
 // FUNCTIONS
@@ -706,6 +709,58 @@ static esp_err_t http_server_get_data_handler(httpd_req_t *req)
     return error;
 }
 
+/**
+ * @brief HTTP GET handler for getting the saved station SSID from NVS
+ * 
+ * Respond with a JSON object:
+ * {"station_ssid": "your_saved_ssid"} if found, or
+ * {"station_ssid": ""} if not found or an error occurs
+ * 
+ * @param req HTTP request for which the URI needs to be handled
+ * @return ESP_OK on success, ESP_FAIL on failure
+ */
+static esp_err_t http_server_get_saved_station_ssid_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "Saved Station SSID Requested");
+    char station_ssid[64] = {0}; // Buffer for SSID
+    char station_password[64] = {0}; // Buffer for password (needed for nvs_load, but not sent)
+    char response_json[100];     // Buffer for JSON response
+
+    esp_err_t err = nvs_storage_load_wifi_creds(station_ssid, sizeof(station_ssid), station_password, sizeof(station_password));
+
+    if (err == ESP_OK)
+    {
+        ESP_LOGI(TAG, "Found saved SSID: %s", station_ssid);
+        snprintf(response_json, sizeof(response_json), "\"station_ssid\":\"%s\"", station_ssid);
+    }
+    else if (err == ESP_ERR_NVS_NOT_FOUND)
+    {
+        ESP_LOGI(TAG, "No saved station SSID found in NVS.");
+        snprintf(response_json, sizeof(response_json), "\"station_ssid\":\"\"");
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Error loading station SSID from NVS: %s", esp_err_to_name(err));
+        snprintf(response_json, sizeof(response_json), "\"station_ssid\":\"\""); // Send empty on other errors too
+        // Optionally, you could send a 500 error for internal NVS issues
+        // httpd_resp_send_500(req);
+        // return ESP_FAIL;
+    }
+
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t send_err = httpd_resp_send(req, response_json, strlen(response_json));
+
+    if (send_err != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Error %d while sending saved SSID response", send_err);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "Saved SSID response sent successfully");
+    }
+    return send_err; // Return the status of sending the response    
+}
+
 static void get_local_time_string(char *time_str, size_t len)
 {
     time_t now = time(NULL);
@@ -793,12 +848,7 @@ static int16_t get_humidity(void)
 
 static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
 {
-    bool isComma = false;
-    int32_t length = 0;
-    uint16_t rsp_len = 0;
-    char response[100];
-    char temp_buff[256] = {0};
-    ESP_LOGI(TAG, "Parameters Request Received");
+   ESP_LOGI(TAG, "Parameters Request Received");
 
     // Read request content
     char buf[256];
@@ -820,27 +870,47 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
     httpd_req_get_hdr_value_str(req, "my-connect-ssid", ssid, sizeof(ssid));
     httpd_req_get_hdr_value_str(req, "my-connect-pswd", pswd, sizeof(pswd));
 
-    nvs_storage_save_wifi_creds(ssid, pswd);
+    if (strlen(ssid) == 0) {
+        ESP_LOGE(TAG, "Received empty SSID. Cannot connect.");
+        // Send an error response
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SSID cannot be empty");
+        return ESP_FAIL;
+    }
 
-    ESP_LOGI(TAG, "ssid: %s, pswd: %s", ssid, pswd);
+    esp_err_t save_err = nvs_storage_save_wifi_creds(ssid, pswd);
 
-    rsp_len = snprintf(response, sizeof(response), "{\"ssid\":\"%s\",\"pswd\":\"%s\"}", ssid, pswd);
+    if (save_err == ESP_OK) {
+        ESP_LOGI(TAG, "Wi-Fi credentials (SSID: %s) saved to NVS.", ssid);
+        // Now, attempt to connect with these new credentials
+        esp_err_t connect_err = app_station_connect_to_ap(ssid, pswd);
+        if (connect_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to initiate connection to AP %s.", ssid);
+            // Still respond positively for saving, but log error for connection attempt
+        }
+    } else {
+        ESP_LOGE(TAG, "Failed to save Wi-Fi credentials to NVS.");
+        // Consider sending an error response to the client
+    }
+
+
+    // Respond to client (original response logic)
+    char response_buf[100]; // Renamed from 'response' to avoid conflict if it's a global
+    uint16_t rsp_len = snprintf(response_buf, sizeof(response_buf), "\"ssid\":\"%s\",\"pswd_saved\":\"%s\"", ssid, (save_err == ESP_OK) ? "ok" : "failed");
     
-    // Send response back to client
     httpd_resp_set_type(req, "application/json");
+
+    esp_err_t send_err = httpd_resp_send(req, response_buf, rsp_len);
     
-    esp_err_t error = httpd_resp_send(req, response, rsp_len);
-    
-    if (error != ESP_OK)
+    if (send_err != ESP_OK)
     {
-        ESP_LOGE(TAG, "Error %d while sending params response", error);
+        ESP_LOGE(TAG, "Error %d while sending wifi connect response", send_err);
     }
     else
     {
-        ESP_LOGI(TAG, "Params response sent successfully");
+        ESP_LOGI(TAG, "Wifi connect response sent successfully");
     }
 
-    return ESP_OK;
+    return send_err; // Return status of sending the response
 }
 
 // HTTP Error (404) Handler - Redirects all requests to the root page
