@@ -9,6 +9,8 @@
 
 #pragma once
 
+#include "esp_err.h" // Added for esp_err_t
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -17,8 +19,9 @@ extern "C" {
  * @brief Set ups and starts a simple DNS server that will respond to all queries
  * with the soft AP's IP address
  *
+ * @return esp_err_t ESP_OK on success, ESP_FAIL or other error code on failure.
  */
-void start_dns_server(void);
+esp_err_t start_dns_server(void); // Changed return type to esp_err_t
 
 
 #ifdef __cplusplus

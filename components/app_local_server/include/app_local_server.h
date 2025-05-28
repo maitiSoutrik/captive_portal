@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <stdbool.h>
+#include "esp_err.h" // Added for esp_err_t
 #include "nvs_storage.h"
 
 /*
@@ -45,8 +46,8 @@ typedef struct http_server_q_msg
 
 void http_server_fw_update_reset_cb(void *arg);
 
-bool app_local_server_init(void);
-bool app_local_server_start(void);
-bool app_local_server_process(void);
+esp_err_t app_local_server_init(void); // Changed return type to esp_err_t
+esp_err_t app_local_server_start(void); // Changed return type to esp_err_t
+esp_err_t app_local_server_process(void); // Changed return type to esp_err_t
 
 #endif /* APP_LOCAL_SERVER_H_ */

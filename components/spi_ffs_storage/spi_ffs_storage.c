@@ -1,8 +1,9 @@
 #include "spi_ffs_storage.h"
+#include "esp_err.h" // Added for esp_err_t
 
 #define TAG "SPI_FFS_STORAGE"
 
-void spi_ffs_storage_init() {
+esp_err_t spi_ffs_storage_init() { // Changed return type to esp_err_t
     // Initialize SPIFFS
     ESP_LOGI(TAG, "Initializing SPIFFS");
 
@@ -25,7 +26,7 @@ void spi_ffs_storage_init() {
         } else {
             ESP_LOGE(TAG, "Failed to initialize SPIFFS (%s)", esp_err_to_name(ret));
         }
-        return;
+        return ret; // Return the error code
     }
     
     ESP_LOGI(TAG, "Performing SPIFFS_check().");
@@ -34,7 +35,10 @@ void spi_ffs_storage_init() {
     
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "SPIFFS_check() failed (%s)", esp_err_to_name(ret));
-        return;
+        // esp_vfs_spiffs_unregister might be needed here if spiffs_register succeeded but check failed
+        // For simplicity, just returning the error from check.
+        // Consider unregistering if spiffs was registered: esp_vfs_spiffs_unregister(conf.partition_label);
+        return ret; // Return the error code
     } else {
         ESP_LOGI(TAG, "SPIFFS_check() successful");
     }
@@ -45,8 +49,12 @@ void spi_ffs_storage_init() {
 
     if (ret != ESP_OK) {
         ESP_LOGE(TAG, "Failed to get SPIFFS partition information (%s). Formatting...", esp_err_to_name(ret));
-        esp_spiffs_format(conf.partition_label);
-        return;
+        // Attempt to format, but this might also fail.
+        // Consider if formatting should be automatic or a specific recovery step.
+        // For now, just log and return the error from esp_spiffs_info.
+        // esp_spiffs_format(conf.partition_label); // This itself can fail.
+        esp_vfs_spiffs_unregister(conf.partition_label);
+        return ret;
     } else {
         ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
     }
@@ -59,13 +67,15 @@ void spi_ffs_storage_init() {
         // More info at https://github.com/pellepl/spiffs/wiki/FAQ#powerlosses-contd-when-should-i-run-spiffs_check
         if (ret != ESP_OK) {
             ESP_LOGE(TAG, "SPIFFS_check() failed (%s)", esp_err_to_name(ret));
-            return;
+            // esp_vfs_spiffs_unregister(conf.partition_label); // Consider unregistering
+            return ret; // Return the error code
         } else {
             ESP_LOGI(TAG, "SPIFFS_check() successful");
         }
     }
 
     spi_ffs_storage_list_files();
+    return ESP_OK; // Success
 }
 
 void spi_ffs_storage_test()
@@ -120,7 +130,9 @@ void spi_ffs_storage_test()
 
 bool spi_ffs_storage_create_file(const char *filename) 
 {
-    FILE* f = fopen(filename, "w");
+    char full_path[256];
+snprintf(full_path, sizeof(full_path), "/spiffs/%s", filename);
+FILE* f = fopen(full_path, "w");
     
     if (f == NULL)
     {

@@ -6,23 +6,21 @@
     software is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
     CONDITIONS OF ANY KIND, either express or implied.
 */
-#include <time.h> 
-#include <sys/time.h> 
-#include <stdio.h> 
-#include "time_sync.h"
-#include "esp_wifi.h"
-#include "esp_event.h"
-#include "esp_log.h"
-#include "esp_netif.h"
-#include "nvs_flash.h"
-#include "lwip/inet.h"
-#include "esp_mac.h"
 
-// Components
+#include <stdio.h>
+#include <string.h>
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "esp_log.h"
+#include "nvs_flash.h"
+#include "esp_netif.h"
+#include "esp_event.h"
+
+// Component includes
+#include "app_wifi.h"
+#include "app_time_sync.h"
 #include "app_local_server.h"
-#include "app_station.h"
 #include "dns_server.h"
-#include "time_sync.h"
 #include "nvs_storage.h"
 #include "spi_ffs_storage.h"
 
@@ -30,111 +28,163 @@
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_AP_PASSWORD
 #define EXAMPLE_MAX_STA_CONN CONFIG_ESP_MAX_AP_STA_CONN
 
-static const char *TAG = "example";
+static const char *TAG = "main";
 
-// GLOBAL VARIABLES
-
-// FUNCTION PROTOTYPES
-static void wifi_init_softap(void);
-static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data);
+/* Event callback functions */
+static void wifi_event_callback(app_wifi_status_t status, void *user_data);
+static void time_sync_callback(app_time_sync_status_t status, time_t current_time, void *user_data);
 
 void app_main(void)
 {
-    nvs_storage_init();
-    // Initialize networking stack
+    ESP_LOGI(TAG, "Starting Captive Portal Application");
+
+    /* Initialize core systems */
+    ESP_LOGI(TAG, "Initializing NVS storage");
+    nvs_storage_init(); // nvs_storage_init returns void
+    
+    ESP_LOGI(TAG, "Initializing network interface");
     ESP_ERROR_CHECK(esp_netif_init());
-
-    app_local_server_init();
-
-    // Create default event loop needed by the  main app
+    
+    ESP_LOGI(TAG, "Creating default event loop");
     ESP_ERROR_CHECK(esp_event_loop_create_default());
-
-    // Initialize Wi-Fi including netif with default config
-    esp_netif_create_default_wifi_ap();
-    esp_netif_create_default_wifi_sta();
-
-    wifi_init_config_t cfg = WIFI_INIT_CONFIG_DEFAULT();
-    ESP_ERROR_CHECK(esp_wifi_init(&cfg));
-
-    ESP_ERROR_CHECK(esp_wifi_set_mode(WIFI_MODE_APSTA));
-
-    // Initialise ESP32 in SoftAP mode
-    wifi_init_softap();
-    wifi_init_sta();
-
-    app_local_server_start();
-    start_dns_server();
-
-    ESP_ERROR_CHECK(esp_wifi_start());
-
-    esp_netif_ip_info_t ip_info;
-    esp_netif_get_ip_info(esp_netif_get_handle_from_ifkey("WIFI_AP_DEF"), &ip_info);
-
-    char ip_addr[16];
-    inet_ntoa_r(ip_info.ip.addr, ip_addr, 16);
-    ESP_LOGI(TAG, "Set up softAP with IP: %s", ip_addr);
-
-    ESP_LOGI(TAG, "wifi_init_softap finished. SSID:'%s' password:'%s'",
-             EXAMPLE_ESP_WIFI_AP_SSID, EXAMPLE_ESP_WIFI_PASS);
     
+    /* Initialize storage systems */
+    ESP_LOGI(TAG, "Initializing SPI FFS storage");
+    ESP_ERROR_CHECK(spi_ffs_storage_init());
     
-    time_sync_init();
-
-    spi_ffs_storage_init();
-
+    /* Test storage functionality */
+    ESP_LOGI(TAG, "Testing SPI FFS storage");
     spi_ffs_storage_test();
-    
-    // Test all the new SPIFFS API functions
     spi_ffs_storage_test_all_functions();
     
+    /* Initialize and configure WiFi */
+    ESP_LOGI(TAG, "Initializing WiFi component");
+    ESP_ERROR_CHECK(app_wifi_init(APP_WIFI_MODE_APSTA, wifi_event_callback, NULL));
+    // app_wifi_register_event_callback was removed, callback passed to init
     
-    while (1)
-    {
+    /* Configure Access Point */
+    ESP_LOGI(TAG, "Configuring WiFi Access Point");
+    ESP_ERROR_CHECK(app_wifi_set_ap_config(EXAMPLE_ESP_WIFI_AP_SSID, 
+                                           EXAMPLE_ESP_WIFI_PASS, 
+                                           EXAMPLE_MAX_STA_CONN));
+    
+    /* Start WiFi */
+    ESP_LOGI(TAG, "Starting WiFi");
+    ESP_ERROR_CHECK(app_wifi_start());
+    
+    /* Initialize time synchronization */
+    ESP_LOGI(TAG, "Initializing time synchronization");
+    ESP_ERROR_CHECK(app_time_sync_init(time_sync_callback, NULL));
+    // app_time_sync_register_callback was removed, callback passed to init
+    
+    /* Start time synchronization */
+    ESP_LOGI(TAG, "Starting time synchronization");
+    ESP_ERROR_CHECK(app_time_sync_start());
+    
+    /* Initialize and start HTTP server */
+    ESP_LOGI(TAG, "Initializing HTTP server");
+    ESP_ERROR_CHECK(app_local_server_init());
+    ESP_ERROR_CHECK(app_local_server_start());
+    
+    /* Start DNS server */
+    ESP_LOGI(TAG, "Starting DNS server");
+    ESP_ERROR_CHECK(start_dns_server());
+    
+    /* Log startup completion */
+    // AP IP logging removed as app_wifi_get_ap_ip was removed. 
+    // If needed, obtain from esp_netif directly or add a simplified getter.
+    ESP_LOGI(TAG, "Captive portal started successfully!");
+    ESP_LOGI(TAG, "SSID: %s", EXAMPLE_ESP_WIFI_AP_SSID);
+    if (strlen(EXAMPLE_ESP_WIFI_PASS) > 0) {
+        ESP_LOGI(TAG, "Password: %s", EXAMPLE_ESP_WIFI_PASS);
+    } else {
+        ESP_LOGI(TAG, "Open network (no password)");
+    }
+    
+    /* Main application loop */
+    ESP_LOGI(TAG, "Entering main application loop");
+    while (1) {
+        /* Process HTTP server requests */
+        // app_local_server_process now returns esp_err_t, but its return is not critical for the loop to continue.
+        // If an error occurs within, it's logged by the component.
+        // If it were critical, we would do: ESP_ERROR_CHECK_WITHOUT_ABORT(app_local_server_process()); or handle it.
         app_local_server_process();
-        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        
+        /* Small delay to prevent watchdog timeout */
+        vTaskDelay(pdMS_TO_TICKS(1000));
     }
 }
 
-static void wifi_init_softap(void)
+/**
+ * @brief WiFi event callback handler
+ * 
+ * This function is called whenever there's a change in WiFi status
+ * (connection, disconnection, etc.)
+ */
+static void wifi_event_callback(app_wifi_status_t status, void *user_data)
 {
-    ESP_ERROR_CHECK(esp_event_handler_register(WIFI_EVENT, ESP_EVENT_ANY_ID, &wifi_event_handler, NULL));
-
-    wifi_config_t wifi_config = {
-        .ap = {
-            .ssid = EXAMPLE_ESP_WIFI_AP_SSID,
-            .ssid_len = strlen(EXAMPLE_ESP_WIFI_AP_SSID),
-            .password = EXAMPLE_ESP_WIFI_PASS,
-            .max_connection = EXAMPLE_MAX_STA_CONN,
-            .authmode = WIFI_AUTH_WPA_WPA2_PSK},
-    };
-    if (strlen(EXAMPLE_ESP_WIFI_PASS) == 0)
-    {
-        wifi_config.ap.authmode = WIFI_AUTH_OPEN;
+    switch (status) {
+        case APP_WIFI_STATUS_CONNECTED:
+            {
+                ESP_LOGI(TAG, "WiFi station connected successfully");
+                // STA IP is logged by app_wifi component on IP_EVENT_STA_GOT_IP.
+                // Number of connected stations logging removed as app_wifi_get_connected_stations was removed.
+            }
+            break;
+            
+        case APP_WIFI_STATUS_DISCONNECTED:
+            ESP_LOGI(TAG, "WiFi station disconnected");
+            break;
+            
+        case APP_WIFI_STATUS_CONNECTING:
+            ESP_LOGI(TAG, "WiFi station connecting...");
+            break;
+            
+        case APP_WIFI_STATUS_FAILED:
+            ESP_LOGW(TAG, "WiFi station connection failed");
+            break;
+            
+        default:
+            ESP_LOGW(TAG, "Unknown WiFi status: %u", status);
+            break;
     }
-
-    ESP_ERROR_CHECK(esp_wifi_set_config(ESP_IF_WIFI_AP, &wifi_config));
 }
 
-static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
+/**
+ * @brief Time synchronization callback handler
+ * 
+ * This function is called whenever there's a change in time sync status
+ */
+static void time_sync_callback(app_time_sync_status_t status, time_t current_time, void *user_data)
 {
-    // Mark unused parameters to prevent warnings if -Wno-unused-parameter is not set or to be explicit
-    (void)arg;
-    (void)event_base;
-
-    char log_buffer[128]; // Buffer for formatted log messages
-
-    if (event_id == WIFI_EVENT_AP_STACONNECTED)
-    {
-        wifi_event_ap_staconnected_t *event = (wifi_event_ap_staconnected_t *)event_data;
-        snprintf(log_buffer, sizeof(log_buffer), "station " MACSTR " join, AID=%d",
-                 MAC2STR(event->mac), event->aid);
-        ESP_LOGI(TAG, "%s", log_buffer);
-    }
-    else if (event_id == WIFI_EVENT_AP_STADISCONNECTED)
-    {
-        wifi_event_ap_stadisconnected_t *event = (wifi_event_ap_stadisconnected_t *)event_data;
-        snprintf(log_buffer, sizeof(log_buffer), "station " MACSTR " leave, AID=%d",
-                 MAC2STR(event->mac), event->aid);
-        ESP_LOGI(TAG, "%s", log_buffer);
+    switch (status) {
+        case APP_TIME_SYNC_STATUS_COMPLETED:
+            {
+                ESP_LOGI(TAG, "Time synchronization completed successfully");
+                // Time formatting, DST, and offset logging removed as related functions were removed.
+                // current_time (time_t) is available if needed.
+                struct tm timeinfo;
+                char strftime_buf[64];
+                localtime_r(&current_time, &timeinfo);
+                strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
+                ESP_LOGI(TAG, "Current local time: %s", strftime_buf);
+            }
+            break;
+            
+        case APP_TIME_SYNC_STATUS_IN_PROGRESS:
+            ESP_LOGI(TAG, "Time synchronization in progress...");
+            break;
+            
+        case APP_TIME_SYNC_STATUS_FAILED:
+            ESP_LOGW(TAG, "Time synchronization failed");
+            break;
+            
+        case APP_TIME_SYNC_STATUS_NOT_STARTED:
+            ESP_LOGI(TAG, "Time synchronization not started");
+            break;
+            
+        default:
+            ESP_LOGW(TAG, "Unknown time sync status: %u", status);
+            break;
     }
 }
