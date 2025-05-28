@@ -51,7 +51,6 @@ void spi_ffs_storage_init() {
         ESP_LOGI(TAG, "Partition size: total: %d, used: %d", total, used);
     }
 
-#
     // Check consistency of reported partiton size info.
     if (used > total) {
         ESP_LOGW(TAG, "Number of used bytes cannot be larger than total. Performing SPIFFS_check().");
@@ -66,6 +65,7 @@ void spi_ffs_storage_init() {
         }
     }
 
+    spi_ffs_storage_list_files();
 }
 
 void spi_ffs_storage_test()
@@ -117,3 +117,49 @@ void spi_ffs_storage_test()
     // esp_vfs_spiffs_unregister(conf.partition_label);
     // ESP_LOGI(TAG, "SPIFFS unmounted"); 
 }
+
+bool spi_ffs_storage_create_file(const char *filename) 
+{
+    FILE* f = fopen(filename, "w");
+    
+    if (f == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to open file for writing");
+        
+        return false;
+    }
+    
+    fclose(f);
+    
+    return true;
+}
+
+bool spi_ffs_storage_list_files(void) 
+{
+    DIR* dir = opendir("/spiffs");
+
+    ESP_LOGI(TAG, "Directory contents:");
+
+    if(dir == NULL) 
+    {
+        ESP_LOGE(TAG, "Failed to open directory");
+        return false;
+    }
+    
+    
+    struct dirent* ent;
+    
+    while ((ent = readdir(dir)) != NULL)
+    {
+        ESP_LOGI(TAG, "%s File: '%s'", __func__ , ent->d_name);
+    }
+    
+    closedir(dir);
+
+    ESP_LOGI(TAG, "Listed files successfully."); 
+
+    return true;
+}
+
+
+
