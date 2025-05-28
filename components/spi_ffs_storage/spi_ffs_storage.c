@@ -182,7 +182,7 @@ bool spi_ffs_file_write(const char *filename, const char *data, bool append)
     }
 
     // Write data to file
-    size_t data_len = strlen(data);
+    size_t data_len = strlen(data); // Take the data length as an argument instead of calculating it here
     size_t written = fwrite(data, 1, data_len, f);
     
     fclose(f);
@@ -215,7 +215,7 @@ bool spi_ffs_file_read(const char *filename, char *buffer, size_t buffer_size)
     }
 
     // Read data from file
-    size_t bytes_read = fread(buffer, 1, buffer_size - 1, f);
+    size_t bytes_read = fread(buffer, 1, buffer_size - 1, f); // 2nd param is size of each element (1 byte in this case) and 3rd param is number of elements to read
     fclose(f);
 
     // Null-terminate the buffer
