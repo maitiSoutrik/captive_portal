@@ -1,7 +1,5 @@
-idf_component_register(SRCS
-                        "main.c" 
-                        "dns_server.c"
-                        "time_sync.c"
-                        "app_station.c" 
-                        INCLUDE_DIRS "include"
-                        REQUIRES app_local_server spi_ffs_storage nvs_storage nvs_flash esp_wifi)
+idf_component_register(
+    SRCS "main.c" "dns_server.c"
+    INCLUDE_DIRS "include"
+    REQUIRES app_wifi app_time_sync app_local_server nvs_storage spi_ffs_storage esp_netif esp_event
+)

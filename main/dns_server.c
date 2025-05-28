@@ -242,7 +242,13 @@ void dns_server_task(void *pvParameters)
     vTaskDelete(NULL);
 }
 
-void start_dns_server(void)
+esp_err_t start_dns_server(void) // Changed return type to esp_err_t
 {
-    xTaskCreate(dns_server_task, "dns_server", 4096, NULL, 5, NULL);
+    BaseType_t ret = xTaskCreate(dns_server_task, "dns_server", 4096, NULL, 5, NULL);
+    if (ret != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create DNS server task. Error code: %d", ret);
+        return ESP_FAIL; // Or a more specific error like ESP_ERR_NO_MEM if appropriate
+    }
+    ESP_LOGI(TAG, "DNS server task created successfully.");
+    return ESP_OK;
 }

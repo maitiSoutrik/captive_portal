@@ -12,7 +12,7 @@
 #include "dirent.h"
 
 
-void spi_ffs_storage_init();
+esp_err_t spi_ffs_storage_init(); // Changed return type to esp_err_t
 void spi_ffs_storage_test();
 /*
 File operation APIs

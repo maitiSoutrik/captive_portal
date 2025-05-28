@@ -20,9 +20,11 @@
 #include <cJSON.h>
 #include <time.h>
 #include "nvs.h"
+#include "esp_err.h" // Added for esp_err_t
 
 #include "app_local_server.h"
-#include "app_station.h"
+// #include "app_station.h" // Replaced by app_wifi.h (implicitly included via app_local_server.h or directly if needed)
+#include "app_wifi.h" // Ensure app_wifi component is included for app_wifi_connect_sta
 
 
 // DEFINES
@@ -100,7 +102,7 @@ static esp_err_t http_server_get_data_handler(httpd_req_t *req);
 static void http_server_monitor(void);
 static void http_server_fw_update_reset_timer(void);
 static esp_err_t http_server_sensor_handler(httpd_req_t *req); // Add prototype for new sensor handler
-static void start_webserver(void);
+static esp_err_t start_webserver(void); // Changed return type
 static void get_local_time_string(char *time_str, size_t len);
 static void get_local_time_string_utc(char *time_str, size_t len);
 static int16_t get_temperature(void);
@@ -126,28 +128,37 @@ static const httpd_uri_t uri_handlers[] = {
 };
 
 // FUNCTIONS
-bool app_local_server_init(void)
+esp_err_t app_local_server_init(void)
 {
    // create a message queue
     http_server_monitor_q_handle = xQueueCreate(HTTP_SERVER_MONITOR_QUEUE_LEN,
-                                                sizeof(http_server_q_msg_t));    
-    return true;
+                                                sizeof(http_server_q_msg_t));
+    if (http_server_monitor_q_handle == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to create http_server_monitor_q_handle");
+        return ESP_ERR_NO_MEM; // Or another appropriate error code
+    }
+    return ESP_OK;
 }
 
-bool app_local_server_start(void)
+esp_err_t app_local_server_start(void) // Changed return type to esp_err_t
 {
     // Start the server
-    start_webserver();
-
-    return true;
+    esp_err_t ret = start_webserver();
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "app_local_server_start failed because start_webserver failed. Error: %s", esp_err_to_name(ret));
+        return ret; // Propagate the error
+    }
+    return ESP_OK;
 }
 
-bool app_local_server_process(void)
+esp_err_t app_local_server_process(void) // Changed return type to esp_err_t
 {
-    // Proces the HTTP Monitoro task
-    http_server_monitor();
-
-    return true;
+    // Process the HTTP Monitor task
+    http_server_monitor(); // http_server_monitor is void, so no direct error to propagate here
+                           // However, if http_server_monitor_q_handle was NULL, it would crash inside.
+                           // We've added checks in app_local_server_init for queue creation.
+    return ESP_OK;         // Assuming success if we reach here without a crash.
 }
 
 /*
@@ -220,27 +231,51 @@ static void http_server_monitor(void)
     }
 }
 
-static void start_webserver(void)
+static esp_err_t start_webserver(void) // Changed return type and added error handling
 {
     httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-    config.max_uri_handlers = URI_HANDLERS_COUNT + URI_HANDLER_MARGIN; // Reverted to use URI_HANDLERS_COUNT
-    config.max_open_sockets = 13;
+    config.max_uri_handlers = URI_HANDLERS_COUNT + URI_HANDLER_MARGIN;
+    config.max_open_sockets = 13; // Consider making this configurable or checking against HTTPD_DEFAULT_CONFIG().max_open_sockets
     config.lru_purge_enable = true;
 
-    ESP_LOGI(TAG, "Starting on port: '%d'", config.server_port);
-    if (httpd_start(&http_server_handle, &config) == ESP_OK)
+    ESP_LOGI(TAG, "Starting web server on port: '%d'", config.server_port);
+    esp_err_t ret = httpd_start(&http_server_handle, &config);
+
+    if (ret == ESP_OK)
     {
+        ESP_LOGI(TAG, "Web server started successfully.");
         // Set URI handlers
-        for (size_t i = 0; i < URI_HANDLERS_COUNT; i++) // Restored loop
+        for (size_t i = 0; i < URI_HANDLERS_COUNT; i++)
         {
             ESP_LOGI(TAG, "Registering URI handler: %s", uri_handlers[i].uri);
-            httpd_register_uri_handler(http_server_handle, &uri_handlers[i]);
+            ret = httpd_register_uri_handler(http_server_handle, &uri_handlers[i]);
+            if (ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to register URI handler: %s. Error: %s", uri_handlers[i].uri, esp_err_to_name(ret));
+                // Attempt to stop the server if a handler registration fails
+                if (http_server_handle) {
+                    httpd_stop(http_server_handle);
+                    http_server_handle = NULL;
+                }
+                return ret;
+            }
         }
-        httpd_register_err_handler(http_server_handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
+        ESP_LOGI(TAG, "Registering 404 error handler.");
+        ret = httpd_register_err_handler(http_server_handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
+        if (ret != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to register 404 error handler. Error: %s", esp_err_to_name(ret));
+            if (http_server_handle) {
+                httpd_stop(http_server_handle);
+                http_server_handle = NULL;
+            }
+            return ret;
+        }
+        return ESP_OK;
     }
     else
     {
-        ESP_LOGE(TAG, "Failed to start web server");
+        ESP_LOGE(TAG, "Failed to start web server. Error: %s", esp_err_to_name(ret));
+        http_server_handle = NULL; // Ensure handle is NULL if start failed
+        return ret;
     }
 }
 
@@ -882,7 +917,7 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
     if (save_err == ESP_OK) {
         ESP_LOGI(TAG, "Wi-Fi credentials (SSID: %s) saved to NVS.", ssid);
         // Now, attempt to connect with these new credentials
-        esp_err_t connect_err = app_station_connect_to_ap(ssid, pswd);
+        esp_err_t connect_err = app_wifi_connect_sta(ssid, pswd);
         if (connect_err != ESP_OK) {
             ESP_LOGE(TAG, "Failed to initiate connection to AP %s.", ssid);
             // Still respond positively for saving, but log error for connection attempt
