@@ -74,4 +74,6 @@ bool spi_ffs_storage_create_file(const char *filename);
 
 bool spi_ffs_storage_list_files(void);
 
+void spi_ffs_storage_test_all_functions(void);
+
 #endif

@@ -84,6 +84,9 @@ void app_main(void)
 
     spi_ffs_storage_test();
     
+    // Test all the new SPIFFS API functions
+    spi_ffs_storage_test_all_functions();
+    
     
     while (1)
     {
