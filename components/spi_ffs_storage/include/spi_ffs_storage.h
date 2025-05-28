@@ -6,6 +6,7 @@
 #include <string.h>
 #include <sys/unistd.h>
 #include <sys/stat.h>
+#include <stdbool.h>
 #include "esp_err.h"
 #include "esp_log.h"
 #include "esp_spiffs.h"
@@ -23,7 +24,7 @@ File operation APIs
 @param path: Path of the file to write
 @param data: Data to be written
 @param append: Whether to append to an existing file or overwrite it
-@return 1 on success, 0 on failure
+@return true on success, false on failure
 */
 bool spi_ffs_file_write(const char *filename, const char *data, bool append);
 

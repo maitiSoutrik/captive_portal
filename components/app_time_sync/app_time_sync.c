@@ -75,11 +75,15 @@ esp_err_t app_time_sync_init(app_time_sync_cb_t callback, void *user_data)
         ESP_LOGE(TAG, "Failed to create mutex");
         return ESP_ERR_NO_MEM;
     }
-
-    strncpy(s_time_sync_ctx.config.ntp_server, DEFAULT_NTP_SERVER, 
+    strncpy(s_time_sync_ctx.config.ntp_server,
+            DEFAULT_NTP_SERVER,
             sizeof(s_time_sync_ctx.config.ntp_server) - 1);
-    strncpy(s_time_sync_ctx.config.timezone, DEFAULT_TIMEZONE, 
+    s_time_sync_ctx.config.ntp_server[sizeof(s_time_sync_ctx.config.ntp_server) - 1] = '\0';
+
+    strncpy(s_time_sync_ctx.config.timezone,
+            DEFAULT_TIMEZONE,
             sizeof(s_time_sync_ctx.config.timezone) - 1);
+    s_time_sync_ctx.config.timezone[sizeof(s_time_sync_ctx.config.timezone) - 1] = '\0';
     s_time_sync_ctx.config.sync_timeout_ms = DEFAULT_SYNC_TIMEOUT_MS;
     s_time_sync_ctx.config.retry_count = DEFAULT_RETRY_COUNT;
 
