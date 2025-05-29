@@ -40,17 +40,6 @@ typedef struct {
 esp_err_t rfid_manager_init(void);
 
 /**
- * @brief Loads default RFID cards into the database.
- *
- * This function populates the in-memory database with a predefined set of RFID cards
- * and then saves this default set to the persistent storage file.
- * This is typically called during the first boot or if the existing database is invalid.
- *
- * @return esp_err_t ESP_OK on success, or an error code if saving to file fails.
- */
-esp_err_t rfid_manager_load_defaults(void);
-
-/**
  * @brief Adds a new RFID card to the database.
  *
  * Adds the given card_id and name to the list of authorized cards.
@@ -97,60 +86,5 @@ bool rfid_manager_check_card(uint32_t card_id);
  */
 uint16_t rfid_manager_get_card_count(void);
 
-/**
- * @brief Retrieves a list of all active RFID cards.
- *
- * Populates the provided 'cards_buffer' with data of all active RFID cards.
- *
- * @param cards_buffer Pointer to an array of rfid_card_t structures to store the card data.
- * @param buffer_size The maximum number of rfid_card_t elements the cards_buffer can hold.
- * @param num_cards_copied Pointer to a uint16_t that will be filled with the number of cards actually copied to the buffer.
- * @return esp_err_t ESP_OK on success, ESP_ERR_INVALID_ARG if buffer is NULL or too small for any cards,
- *         ESP_FAIL for other errors.
- */
-esp_err_t rfid_manager_list_cards(rfid_card_t* cards_buffer, uint16_t buffer_size, uint16_t* num_cards_copied);
-
-/**
- * @brief Saves the current in-memory RFID database to the SPIFFS file.
- *
- * This function writes the database header and all card data (including inactive ones
- * if they are kept in the array) to the persistent storage file.
- * It also calculates and stores a checksum for data integrity.
- *
- * @return esp_err_t ESP_OK on success, or an error code on failure (e.g., file write error).
- */
-esp_err_t rfid_manager_save_to_file(void);
-
-/**
- * @brief Loads the RFID database from the SPIFFS file into memory.
- *
- * Reads the database header and card data from persistent storage.
- * Verifies the checksum to ensure data integrity.
- *
- * @return esp_err_t ESP_OK on success, ESP_ERR_NOT_FOUND if the file doesn't exist,
- *         ESP_ERR_INVALID_CRC if checksum fails, ESP_FAIL for other errors.
- */
-esp_err_t rfid_manager_load_from_file(void);
-
-/**
- * @brief Formats the RFID database.
- *
- * Clears all existing RFID cards from the database and re-initializes it,
- * typically by loading the default set of cards.
- * This operation is destructive to existing card data.
- *
- * @return esp_err_t ESP_OK on success, or an error code on failure.
- */
-esp_err_t rfid_manager_format_database(void);
-
-/**
- * @brief Checks if the loaded database is valid.
- *
- * This is typically an internal check performed after loading from file,
- * primarily by verifying the checksum.
- *
- * @return true if the database is considered valid, false otherwise.
- */
-bool rfid_manager_is_database_valid(void); // May not be needed as public API if init handles it.
 
 #endif // RFID_MANAGER_H
