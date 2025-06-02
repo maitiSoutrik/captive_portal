@@ -23,6 +23,7 @@
 #include "dns_server.h"
 #include "nvs_storage.h"
 #include "spi_ffs_storage.h"
+#include "custom_partition.h" // Added for custom NVS partition testing
 
 #define EXAMPLE_ESP_WIFI_AP_SSID CONFIG_ESP_WIFI_AP_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_AP_PASSWORD
@@ -42,6 +43,9 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing NVS storage");
     nvs_storage_init(); // nvs_storage_init returns void
     
+    ESP_LOGI(TAG, "Testing NVS custom partition");
+    nvs_custom_partition_test(); // Test the custom NVS functions
+
     ESP_LOGI(TAG, "Initializing network interface");
     ESP_ERROR_CHECK(esp_netif_init());
     
