@@ -10,6 +10,11 @@ static const char *NVS_PARTITION_LABEL = "params"; // Using the "params" partiti
 
 // Helper function to open NVS handle for the custom partition
 static esp_err_t open_nvs_handle(nvs_handle_t *out_handle) {
+    if (out_handle == NULL) {
+        ESP_LOGE(TAG, "out_handle parameter cannot be NULL");
+        return ESP_ERR_INVALID_ARG;
+    }
+
     // Initialize NVS for the "params" partition
     // Note: nvs_flash_init_partition is idempotent, so calling it multiple times for the same partition is safe.
     // However, the main nvs_storage_init() should have initialized the default NVS partition.
@@ -17,10 +22,19 @@ static esp_err_t open_nvs_handle(nvs_handle_t *out_handle) {
     esp_err_t err = nvs_flash_init_partition(NVS_PARTITION_LABEL);
     if (err == ESP_ERR_NVS_NO_FREE_PAGES || err == ESP_ERR_NVS_NEW_VERSION_FOUND) {
         ESP_LOGW(TAG, "NVS partition '%s' init failed (%s), attempting to erase and reinitialize...", NVS_PARTITION_LABEL, esp_err_to_name(err));
-        ESP_ERROR_CHECK(nvs_flash_erase_partition(NVS_PARTITION_LABEL));
+        // Attempt to erase the partition and re-initialize
+        esp_err_t erase_err = nvs_flash_erase_partition(NVS_PARTITION_LABEL);
+        if (erase_err != ESP_OK) {
+            ESP_LOGE(TAG, "Failed to erase NVS partition '%s': %s", NVS_PARTITION_LABEL, esp_err_to_name(erase_err));
+            return erase_err; // Return erase error
+        }
         err = nvs_flash_init_partition(NVS_PARTITION_LABEL);
     }
-    ESP_ERROR_CHECK(err); // Abort if fatal error after erase attempt
+
+    if (err != ESP_OK) {
+        ESP_LOGE(TAG, "Failed to initialize NVS partition '%s' after potential erase/reinit: %s", NVS_PARTITION_LABEL, esp_err_to_name(err));
+        return err; // Return initialization error
+    }
 
     // Open NVS
     err = nvs_open_from_partition(NVS_PARTITION_LABEL, "storage_ns", NVS_READWRITE, out_handle);
