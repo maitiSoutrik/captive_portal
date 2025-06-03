@@ -65,29 +65,7 @@ static esp_err_t rfid_manager_save_to_file(void);
  */
 static esp_err_t rfid_manager_load_from_file(void);
 
-/**
- * @brief Retrieves a list of all active RFID cards.
- *
- * Populates the provided 'cards_buffer' with data of all active RFID cards.
- *
- * @param cards_buffer Pointer to an array of rfid_card_t structures to store the card data.
- * @param buffer_size The maximum number of rfid_card_t elements the cards_buffer can hold.
- * @param num_cards_copied Pointer to a uint16_t that will be filled with the number of cards actually copied to the buffer.
- * @return esp_err_t ESP_OK on success, ESP_ERR_INVALID_ARG if buffer is NULL or too small for any cards,
- *         ESP_FAIL for other errors.
- */
-static esp_err_t rfid_manager_list_cards(rfid_card_t *cards_buffer, uint16_t buffer_size, uint16_t *num_cards_copied);
 
-/**
- * @brief Formats the RFID database.
- *
- * Clears all existing RFID cards from the database and re-initializes it,
- * typically by loading the default set of cards.
- * This operation is destructive to existing card data.
- *
- * @return esp_err_t ESP_OK on success, or an error code on failure.
- */
-static esp_err_t rfid_manager_format_database(void);
 
 /**
  * @brief Checks if the loaded database is valid.
@@ -531,33 +509,59 @@ static esp_err_t rfid_manager_load_from_file(void)
     return ESP_OK;
 }
 
-static esp_err_t rfid_manager_list_cards(rfid_card_t *cards_buffer, uint16_t buffer_size, uint16_t *num_cards_copied)
+esp_err_t rfid_manager_list_cards(rfid_card_t *cards_buffer, uint16_t buffer_size, uint16_t *num_cards_copied)
 {
     if (cards_buffer == NULL || num_cards_copied == NULL)
     {
+        ESP_LOGE(TAG, "list_cards: Invalid arguments"); // Added logging for invalid args
         return ESP_ERR_INVALID_ARG;
     }
 
-    uint16_t active_cards_found = 0;
-    for (uint16_t i = 0; i < RFID_MAX_CARDS && active_cards_found < buffer_size; ++i)
-    {
-        if (rfid_database[i].active && rfid_database[i].card_id != 0)
-        {
-            cards_buffer[active_cards_found] = rfid_database[i];
-            active_cards_found++;
-        }
-    }
-    *num_cards_copied = active_cards_found;
+    esp_err_t ret = ESP_OK; // Initialize ret
 
-    return ESP_OK;
+    // Try to take the mutex
+    if (xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(2000)) == pdTRUE)
+    {
+        uint16_t active_cards_found = 0;
+        for (uint16_t i = 0; i < RFID_MAX_CARDS && active_cards_found < buffer_size; ++i)
+        {
+            if (rfid_database[i].active && rfid_database[i].card_id != 0)
+            {
+                cards_buffer[active_cards_found] = rfid_database[i];
+                active_cards_found++;
+            }
+        }
+        *num_cards_copied = active_cards_found;
+
+        // Give back the mutex
+        xSemaphoreGive(rfid_mutex);
+        ESP_LOGD(TAG, "Listed %u cards", active_cards_found);
+    }
+    else // This 'else' block was missing in the provided snippet
+    {
+        ESP_LOGE(TAG, "Failed to take RFID mutex in list_cards");
+        *num_cards_copied = 0; // Ensure num_cards_copied is set on failure
+        ret = ESP_FAIL;        // Set return value to indicate failure
+    }
+    return ret;
 }
 
-static esp_err_t rfid_manager_format_database(void)
+esp_err_t rfid_manager_format_database(void)
 {
-    ESP_LOGW(TAG, "Formatting RFID database. All existing cards will be erased and defaults loaded.");
-    // Essentially, just load defaults, which will overwrite the file.
-    esp_err_t ret = rfid_manager_load_defaults();
-
+    esp_err_t ret = ESP_FAIL;
+    if (xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(5000)) == pdTRUE) // Longer timeout for format
+    {
+        ESP_LOGW(TAG, "Formatting RFID database. All existing cards will be erased and defaults loaded.");
+        // Essentially, just load defaults, which will overwrite the file.
+        // rfid_manager_load_defaults itself calls rfid_manager_save_to_file.
+        // These helpers do not take the mutex, assuming the caller (this function) does.
+        ret = rfid_manager_load_defaults();
+        xSemaphoreGive(rfid_mutex);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to take RFID mutex in format_database");
+    }
     return ret;
 }
 

@@ -86,5 +86,29 @@ bool rfid_manager_check_card(uint32_t card_id);
  */
 uint16_t rfid_manager_get_card_count(void);
 
+/**
+ * @brief Retrieves a list of all active RFID cards.
+ *
+ * Populates the provided 'cards_buffer' with data of all active RFID cards.
+ *
+ * @param cards_buffer Pointer to an array of rfid_card_t structures to store the card data.
+ * @param buffer_size The maximum number of rfid_card_t elements the cards_buffer can hold.
+ *                    It's recommended this be at least RFID_MAX_CARDS.
+ * @param num_cards_copied Pointer to a uint16_t that will be filled with the number of cards actually copied to the buffer.
+ * @return esp_err_t ESP_OK on success, ESP_ERR_INVALID_ARG if buffer is NULL or num_cards_copied is NULL.
+ */
+esp_err_t rfid_manager_list_cards(rfid_card_t *cards_buffer, uint16_t buffer_size, uint16_t *num_cards_copied);
+
+/**
+ * @brief Formats the RFID database.
+ *
+ * Clears all existing RFID cards from the database and re-initializes it
+ * by loading the default set of cards.
+ * This operation is destructive to existing card data.
+ *
+ * @return esp_err_t ESP_OK on success, or an error code on failure.
+ */
+esp_err_t rfid_manager_format_database(void);
+
 
 #endif // RFID_MANAGER_H

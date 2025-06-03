@@ -24,8 +24,8 @@
 
 #include "app_local_server.h"
 // #include "app_station.h" // Replaced by app_wifi.h (implicitly included via app_local_server.h or directly if needed)
-#include "app_wifi.h" // Ensure app_wifi component is included for app_wifi_connect_sta
-
+#include "app_wifi.h"     // Ensure app_wifi component is included for app_wifi_connect_sta
+#include "rfid_manager.h" // For RFID card management
 
 // DEFINES
 #define URI_HANDLER_MARGIN (1u)
@@ -57,8 +57,6 @@ extern const char favicon_ico_end[] asm("_binary_favicon_ico_end");
 extern const char root_start[] asm("_binary_root_html_start");
 extern const char root_end[] asm("_binary_root_html_end");
 
-
-
 static char http_server_buffer[HTTP_SERVER_BUFFER_SIZE] = {0};
 
 static httpd_handle_t http_server_handle = NULL;
@@ -78,7 +76,8 @@ static const esp_timer_create_args_t fw_update_reset_args =
         .name = "fw_update_reset"};
 esp_timer_handle_t fw_update_reset;
 
-typedef struct{
+typedef struct
+{
     const char *key;
     const char *value;
 } http_rsp_type_t;
@@ -102,7 +101,7 @@ static esp_err_t http_server_get_data_handler(httpd_req_t *req);
 static void http_server_monitor(void);
 static void http_server_fw_update_reset_timer(void);
 static esp_err_t http_server_sensor_handler(httpd_req_t *req); // Add prototype for new sensor handler
-static esp_err_t start_webserver(void); // Changed return type
+static esp_err_t start_webserver(void);                        // Changed return type
 static void get_local_time_string(char *time_str, size_t len);
 static void get_local_time_string_utc(char *time_str, size_t len);
 static int16_t get_temperature(void);
@@ -111,26 +110,41 @@ bool get_data_rsp_string(char *key, char *buffer, uint16_t len);
 static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req);
 static esp_err_t http_server_get_saved_station_ssid_handler(httpd_req_t *req);
 
+// RFID Management API Handlers
+static esp_err_t http_server_rfid_list_cards_handler(httpd_req_t *req);
+static esp_err_t http_server_rfid_add_card_handler(httpd_req_t *req);
+static esp_err_t http_server_rfid_remove_card_handler(httpd_req_t *req);
+static esp_err_t http_server_rfid_get_card_count_handler(httpd_req_t *req);
+static esp_err_t http_server_rfid_check_card_handler(httpd_req_t *req);
+static esp_err_t http_server_rfid_reset_handler(httpd_req_t *req);
+
 static const httpd_uri_t uri_handlers[] = {
-    {"/", HTTP_GET, http_server_index_html_handler,NULL},
-    {"/app.css", HTTP_GET, http_server_app_css_handler,NULL},
-    {"/jquery-3.3.1.min.js", HTTP_GET, http_server_j_query_handler,NULL},
-    {"/app.js", HTTP_GET, http_server_app_js_handler,NULL},
-    {"/favicon.ico", HTTP_GET, http_server_favicon_handler,NULL},
-    {"/OTAupdate", HTTP_POST, http_server_ota_update_handler,NULL},
-    {"/OTAstatus", HTTP_POST, http_server_ota_status_handler,NULL},
-    {"/apSSID", HTTP_GET, http_server_ssid_handler,NULL},
-    {"/localTime", HTTP_GET, http_server_local_time_handler,NULL},
-    {"/getData", HTTP_POST, http_server_get_data_handler,NULL},
+    {"/", HTTP_GET, http_server_index_html_handler, NULL},
+    {"/app.css", HTTP_GET, http_server_app_css_handler, NULL},
+    {"/jquery-3.3.1.min.js", HTTP_GET, http_server_j_query_handler, NULL},
+    {"/app.js", HTTP_GET, http_server_app_js_handler, NULL},
+    {"/favicon.ico", HTTP_GET, http_server_favicon_handler, NULL},
+    {"/OTAupdate", HTTP_POST, http_server_ota_update_handler, NULL},
+    {"/OTAstatus", HTTP_POST, http_server_ota_status_handler, NULL},
+    {"/apSSID", HTTP_GET, http_server_ssid_handler, NULL},
+    {"/localTime", HTTP_GET, http_server_local_time_handler, NULL},
+    {"/getData", HTTP_POST, http_server_get_data_handler, NULL},
     {"/Sensor", HTTP_GET, http_server_sensor_handler, NULL},
     {"/wifiConnect", HTTP_POST, http_server_wifi_connect_handler, NULL},
     {"/getSavedStationSSID", HTTP_GET, http_server_get_saved_station_ssid_handler, NULL},
+    // RFID Endpoints
+    {"/api/rfid/cards", HTTP_GET, http_server_rfid_list_cards_handler, NULL},
+    {"/api/rfid/cards", HTTP_POST, http_server_rfid_add_card_handler, NULL},
+    {"/api/rfid/cards/*", HTTP_DELETE, http_server_rfid_remove_card_handler, NULL}, // Using wildcard for card ID
+    {"/api/rfid/cards/count", HTTP_GET, http_server_rfid_get_card_count_handler, NULL},
+    {"/api/rfid/cards/check", HTTP_POST, http_server_rfid_check_card_handler, NULL},
+    {"/api/rfid/reset", HTTP_POST, http_server_rfid_reset_handler, NULL},
 };
 
 // FUNCTIONS
 esp_err_t app_local_server_init(void)
 {
-   // create a message queue
+    // create a message queue
     http_server_monitor_q_handle = xQueueCreate(HTTP_SERVER_MONITOR_QUEUE_LEN,
                                                 sizeof(http_server_q_msg_t));
     if (http_server_monitor_q_handle == NULL)
@@ -145,7 +159,8 @@ esp_err_t app_local_server_start(void) // Changed return type to esp_err_t
 {
     // Start the server
     esp_err_t ret = start_webserver();
-    if (ret != ESP_OK) {
+    if (ret != ESP_OK)
+    {
         ESP_LOGE(TAG, "app_local_server_start failed because start_webserver failed. Error: %s", esp_err_to_name(ret));
         return ret; // Propagate the error
     }
@@ -249,10 +264,12 @@ static esp_err_t start_webserver(void) // Changed return type and added error ha
         {
             ESP_LOGI(TAG, "Registering URI handler: %s", uri_handlers[i].uri);
             ret = httpd_register_uri_handler(http_server_handle, &uri_handlers[i]);
-            if (ret != ESP_OK) {
+            if (ret != ESP_OK)
+            {
                 ESP_LOGE(TAG, "Failed to register URI handler: %s. Error: %s", uri_handlers[i].uri, esp_err_to_name(ret));
                 // Attempt to stop the server if a handler registration fails
-                if (http_server_handle) {
+                if (http_server_handle)
+                {
                     httpd_stop(http_server_handle);
                     http_server_handle = NULL;
                 }
@@ -261,9 +278,11 @@ static esp_err_t start_webserver(void) // Changed return type and added error ha
         }
         ESP_LOGI(TAG, "Registering 404 error handler.");
         ret = httpd_register_err_handler(http_server_handle, HTTPD_404_NOT_FOUND, http_404_error_handler);
-        if (ret != ESP_OK) {
+        if (ret != ESP_OK)
+        {
             ESP_LOGE(TAG, "Failed to register 404 error handler. Error: %s", esp_err_to_name(ret));
-            if (http_server_handle) {
+            if (http_server_handle)
+            {
                 httpd_stop(http_server_handle);
                 http_server_handle = NULL;
             }
@@ -278,8 +297,6 @@ static esp_err_t start_webserver(void) // Changed return type and added error ha
         return ret;
     }
 }
-
-
 
 /*
  * Check the fw_update_status and creates the fw_update_reset time if the
@@ -601,7 +618,7 @@ static esp_err_t http_server_ssid_handler(httpd_req_t *req)
 {
     char ssid_json[100];
     ESP_LOGI(TAG, "SSID Requested");
-    sprintf(ssid_json, "{\"ssid\":\"%s\"}",CONFIG_ESP_WIFI_SSID);
+    sprintf(ssid_json, "{\"ssid\":\"%s\"}", CONFIG_ESP_WIFI_SSID);
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, ssid_json, strlen(ssid_json));
@@ -612,7 +629,6 @@ static esp_err_t http_server_ssid_handler(httpd_req_t *req)
 static esp_err_t http_server_local_time_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "Local Time Requested");
-
 
     char local_time_str[64];
     char utc_time_str[64];
@@ -626,11 +642,8 @@ static esp_err_t http_server_local_time_handler(httpd_req_t *req)
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, local_time_json, strlen(local_time_json));
 
-
-
     return ESP_OK;
 }
-
 
 static esp_err_t http_server_get_data_handler(httpd_req_t *req)
 {
@@ -746,20 +759,20 @@ static esp_err_t http_server_get_data_handler(httpd_req_t *req)
 
 /**
  * @brief HTTP GET handler for getting the saved station SSID from NVS
- * 
+ *
  * Respond with a JSON object:
  * {"station_ssid": "your_saved_ssid"} if found, or
  * {"station_ssid": ""} if not found or an error occurs
- * 
+ *
  * @param req HTTP request for which the URI needs to be handled
  * @return ESP_OK on success, ESP_FAIL on failure
  */
 static esp_err_t http_server_get_saved_station_ssid_handler(httpd_req_t *req)
 {
     ESP_LOGI(TAG, "Saved Station SSID Requested");
-    char station_ssid[64] = {0}; // Buffer for SSID
+    char station_ssid[64] = {0};     // Buffer for SSID
     char station_password[64] = {0}; // Buffer for password (needed for nvs_load, but not sent)
-    char response_json[100];     // Buffer for JSON response
+    char response_json[100];         // Buffer for JSON response
 
     esp_err_t err = nvs_storage_load_wifi_creds(station_ssid, sizeof(station_ssid), station_password, sizeof(station_password));
 
@@ -793,7 +806,7 @@ static esp_err_t http_server_get_saved_station_ssid_handler(httpd_req_t *req)
     {
         ESP_LOGI(TAG, "Saved SSID response sent successfully");
     }
-    return send_err; // Return the status of sending the response    
+    return send_err; // Return the status of sending the response
 }
 
 static void get_local_time_string(char *time_str, size_t len)
@@ -811,7 +824,6 @@ static void get_local_time_string_utc(char *time_str, size_t len)
     gmtime_r(&now, &timeinfo);
     strftime(time_str, len, "%Y-%m-%d %H:%M:%S", &timeinfo);
 }
-
 
 bool get_data_rsp_string(char *key, char *buffer, uint16_t len)
 {
@@ -883,7 +895,7 @@ static int16_t get_humidity(void)
 
 static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
 {
-   ESP_LOGI(TAG, "Parameters Request Received");
+    ESP_LOGI(TAG, "Parameters Request Received");
 
     // Read request content
     char buf[256];
@@ -905,7 +917,8 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
     httpd_req_get_hdr_value_str(req, "my-connect-ssid", ssid, sizeof(ssid));
     httpd_req_get_hdr_value_str(req, "my-connect-pswd", pswd, sizeof(pswd));
 
-    if (strlen(ssid) == 0) {
+    if (strlen(ssid) == 0)
+    {
         ESP_LOGE(TAG, "Received empty SSID. Cannot connect.");
         // Send an error response
         httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "SSID cannot be empty");
@@ -914,28 +927,31 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
 
     esp_err_t save_err = nvs_storage_save_wifi_creds(ssid, pswd);
 
-    if (save_err == ESP_OK) {
+    if (save_err == ESP_OK)
+    {
         ESP_LOGI(TAG, "Wi-Fi credentials (SSID: %s) saved to NVS.", ssid);
         // Now, attempt to connect with these new credentials
         esp_err_t connect_err = app_wifi_connect_sta(ssid, pswd);
-        if (connect_err != ESP_OK) {
+        if (connect_err != ESP_OK)
+        {
             ESP_LOGE(TAG, "Failed to initiate connection to AP %s.", ssid);
             // Still respond positively for saving, but log error for connection attempt
         }
-    } else {
+    }
+    else
+    {
         ESP_LOGE(TAG, "Failed to save Wi-Fi credentials to NVS.");
         // Consider sending an error response to the client
     }
 
-
     // Respond to client (original response logic)
     char response_buf[100]; // Renamed from 'response' to avoid conflict if it's a global
     uint16_t rsp_len = snprintf(response_buf, sizeof(response_buf), "\"ssid\":\"%s\",\"pswd_saved\":\"%s\"", ssid, (save_err == ESP_OK) ? "ok" : "failed");
-    
+
     httpd_resp_set_type(req, "application/json");
 
     esp_err_t send_err = httpd_resp_send(req, response_buf, rsp_len);
-    
+
     if (send_err != ESP_OK)
     {
         ESP_LOGE(TAG, "Error %d while sending wifi connect response", send_err);
@@ -946,6 +962,213 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
     }
 
     return send_err; // Return status of sending the response
+}
+
+// --- RFID Management API Handlers ---
+
+// GET /api/rfid/cards - List all cards
+static esp_err_t http_server_rfid_list_cards_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "/api/rfid/cards (GET) requested - SIMPLIFIED HANDLER");
+    const char *resp_str = "{\"status\":\"simplified_ok\"}";
+    httpd_resp_set_type(req, "application/json");
+    esp_err_t ret = httpd_resp_send(req, resp_str, strlen(resp_str));
+    if (ret != ESP_OK) {
+        ESP_LOGE(TAG, "Simplified handler failed to send response: %s", esp_err_to_name(ret));
+    }
+    return ret;
+}
+
+// POST /api/rfid/cards - Add new card
+static esp_err_t http_server_rfid_add_card_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "/api/rfid/cards (POST) requested");
+    char content[256];
+    int recv_len = httpd_req_recv(req, content, sizeof(content) - 1);
+    if (recv_len <= 0)
+    {
+        if (recv_len == HTTPD_SOCK_ERR_TIMEOUT)
+        {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+    content[recv_len] = '\0';
+
+    cJSON *json = cJSON_Parse(content);
+    if (json == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to parse JSON for add card: %s", content);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON format");
+        return ESP_FAIL;
+    }
+
+    cJSON *card_id_json = cJSON_GetObjectItem(json, "card_id");
+    cJSON *name_json = cJSON_GetObjectItem(json, "name");
+
+    if (!cJSON_IsString(card_id_json) || !cJSON_IsString(name_json))
+    {
+        ESP_LOGE(TAG, "Missing 'card_id' or 'name' in JSON, or not strings");
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'card_id' or 'name'");
+        return ESP_FAIL;
+    }
+
+    // Convert hex string card_id (e.g., "0x12345678") to uint32_t
+    uint32_t card_id = (uint32_t)strtoul(card_id_json->valuestring, NULL, 0);
+    if (card_id == 0 && strcmp(card_id_json->valuestring, "0x0") != 0 && strcmp(card_id_json->valuestring, "0") != 0)
+    {
+        ESP_LOGE(TAG, "Invalid card_id format: %s", card_id_json->valuestring);
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid card_id format. Must be hex (e.g. 0x1234ABCD) or decimal.");
+        return ESP_FAIL;
+    }
+
+    esp_err_t ret = rfid_manager_add_card(card_id, name_json->valuestring);
+    cJSON_Delete(json);
+
+    if (ret == ESP_OK)
+    {
+        httpd_resp_send(req, "{\"status\":\"success\", \"message\":\"Card added\"}", HTTPD_RESP_USE_STRLEN);
+    }
+    else if (ret == ESP_ERR_NO_MEM) // This error from rfid_manager means storage is full
+    {
+        ESP_LOGE(TAG, "RFID database full. Sending 507.");
+        httpd_resp_set_status(req, "507 Insufficient Storage"); // Set 507 status
+        httpd_resp_set_type(req, "application/json");           // Set content type
+        httpd_resp_send(req, "{\"status\":\"error\", \"message\":\"Database full - Insufficient Storage\"}", HTTPD_RESP_USE_STRLEN);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to add RFID card: %s", esp_err_to_name(ret));
+        httpd_resp_send_500(req);
+    }
+    return ESP_OK;
+}
+
+// DEL /api/rfid/cards/{id} - Remove card
+static esp_err_t http_server_rfid_remove_card_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "/api/rfid/cards/{id} (DELETE) requested: %s", req->uri);
+
+    // Extract card ID from URI: /api/rfid/cards/0x12345678
+    const char *card_id_str_start = req->uri + strlen("/api/rfid/cards/");
+    if (*card_id_str_start == '\0')
+    {
+        ESP_LOGE(TAG, "Card ID missing in URI");
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Card ID missing in URI");
+        return ESP_FAIL;
+    }
+
+    uint32_t card_id = (uint32_t)strtoul(card_id_str_start, NULL, 0); // Handles "0x" prefix or decimal
+    if (card_id == 0 && strcmp(card_id_str_start, "0x0") != 0 && strcmp(card_id_str_start, "0") != 0)
+    {
+        ESP_LOGE(TAG, "Invalid card_id format in URI: %s", card_id_str_start);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid card_id format in URI. Must be hex (e.g. 0x1234ABCD) or decimal.");
+        return ESP_FAIL;
+    }
+
+    ESP_LOGI(TAG, "Attempting to remove card ID: 0x%08lx", (unsigned long)card_id);
+
+    esp_err_t ret = rfid_manager_remove_card(card_id);
+
+    if (ret == ESP_OK)
+    {
+        httpd_resp_send(req, "{\"status\":\"success\", \"message\":\"Card removed\"}", HTTPD_RESP_USE_STRLEN);
+    }
+    else if (ret == ESP_ERR_NOT_FOUND)
+    {
+        char err_msg[100];
+        sprintf(err_msg, "Card ID 0x%08lx not found", (unsigned long)card_id);
+        httpd_resp_send_err(req, HTTPD_404_NOT_FOUND, err_msg);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to remove RFID card: %s", esp_err_to_name(ret));
+        httpd_resp_send_500(req);
+    }
+    return ESP_OK;
+}
+
+// GET /api/rfid/cards/count - Get card count
+static esp_err_t http_server_rfid_get_card_count_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "/api/rfid/cards/count (GET) requested");
+    uint16_t count = rfid_manager_get_card_count();
+    char resp_json[64];
+    sprintf(resp_json, "{\"count\":%u}", count);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, resp_json, strlen(resp_json));
+    return ESP_OK;
+}
+
+// POST /api/rfid/cards/check - Check if card exists
+static esp_err_t http_server_rfid_check_card_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "/api/rfid/cards/check (POST) requested");
+    char content[128]; // Increased size for card_id string
+    int recv_len = httpd_req_recv(req, content, sizeof(content) - 1);
+    if (recv_len <= 0)
+    {
+        if (recv_len == HTTPD_SOCK_ERR_TIMEOUT)
+        {
+            httpd_resp_send_408(req);
+        }
+        return ESP_FAIL;
+    }
+    content[recv_len] = '\0';
+
+    cJSON *json = cJSON_Parse(content);
+    if (json == NULL)
+    {
+        ESP_LOGE(TAG, "Failed to parse JSON for check card: %s", content);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid JSON format");
+        return ESP_FAIL;
+    }
+
+    cJSON *card_id_json = cJSON_GetObjectItem(json, "card_id");
+    if (!cJSON_IsString(card_id_json))
+    {
+        ESP_LOGE(TAG, "Missing 'card_id' in JSON or not a string");
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Missing 'card_id'");
+        return ESP_FAIL;
+    }
+
+    uint32_t card_id = (uint32_t)strtoul(card_id_json->valuestring, NULL, 0);
+    if (card_id == 0 && strcmp(card_id_json->valuestring, "0x0") != 0 && strcmp(card_id_json->valuestring, "0") != 0)
+    {
+        ESP_LOGE(TAG, "Invalid card_id format: %s", card_id_json->valuestring);
+        cJSON_Delete(json);
+        httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Invalid card_id format. Must be hex (e.g. 0x1234ABCD) or decimal.");
+        return ESP_FAIL;
+    }
+
+    cJSON_Delete(json);
+
+    bool exists = rfid_manager_check_card(card_id);
+    char resp_json[64];
+    sprintf(resp_json, "{\"exists\":%s, \"card_id\":\"0x%08lx\"}", exists ? "true" : "false", (unsigned long)card_id);
+    httpd_resp_set_type(req, "application/json");
+    httpd_resp_send(req, resp_json, strlen(resp_json));
+    return ESP_OK;
+}
+
+// POST /api/rfid/reset - Reset to default cards
+static esp_err_t http_server_rfid_reset_handler(httpd_req_t *req)
+{
+    ESP_LOGI(TAG, "/api/rfid/reset (POST) requested");
+    esp_err_t ret = rfid_manager_format_database();
+    if (ret == ESP_OK)
+    {
+        httpd_resp_send(req, "{\"status\":\"success\", \"message\":\"RFID database reset to defaults\"}", HTTPD_RESP_USE_STRLEN);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to reset RFID database: %s", esp_err_to_name(ret));
+        httpd_resp_send_500(req);
+    }
+    return ESP_OK;
 }
 
 // HTTP Error (404) Handler - Redirects all requests to the root page
