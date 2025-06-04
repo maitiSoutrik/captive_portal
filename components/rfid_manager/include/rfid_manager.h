@@ -111,4 +111,7 @@ esp_err_t rfid_manager_list_cards(rfid_card_t *cards_buffer, uint16_t buffer_siz
 esp_err_t rfid_manager_format_database(void);
 
 
+esp_err_t rfid_manager_get_card_list_json(char* buffer, size_t bufferLength);
+
+
 #endif // RFID_MANAGER_H

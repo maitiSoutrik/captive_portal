@@ -135,7 +135,7 @@ static const httpd_uri_t uri_handlers[] = {
     // RFID Endpoints
     {"/api/rfid/cards", HTTP_GET, http_server_rfid_list_cards_handler, NULL},
     {"/api/rfid/cards", HTTP_POST, http_server_rfid_add_card_handler, NULL},
-    {"/api/rfid/cards/*", HTTP_DELETE, http_server_rfid_remove_card_handler, NULL}, // Using wildcard for card ID
+    {"/api/rfid/cards/*", HTTP_DELETE, http_server_rfid_remove_card_handler, NULL},
     {"/api/rfid/cards/count", HTTP_GET, http_server_rfid_get_card_count_handler, NULL},
     {"/api/rfid/cards/check", HTTP_POST, http_server_rfid_check_card_handler, NULL},
     {"/api/rfid/reset", HTTP_POST, http_server_rfid_reset_handler, NULL},
@@ -969,14 +969,29 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
 // GET /api/rfid/cards - List all cards
 static esp_err_t http_server_rfid_list_cards_handler(httpd_req_t *req)
 {
-    ESP_LOGI(TAG, "/api/rfid/cards (GET) requested - SIMPLIFIED HANDLER");
-    const char *resp_str = "{\"status\":\"simplified_ok\"}";
+    char *resp_str = "{\"status\":\"Failed\"}";
+
     httpd_resp_set_type(req, "application/json");
-    esp_err_t ret = httpd_resp_send(req, resp_str, strlen(resp_str));
-    if (ret != ESP_OK) {
-        ESP_LOGE(TAG, "Simplified handler failed to send response: %s", esp_err_to_name(ret));
+
+    ESP_LOGI(TAG, "/api/rfid/cards (GET) requested - SIMPLIFIED HANDLER");
+    
+    if(rfid_manager_get_card_list_json(http_server_buffer, HTTP_SERVER_BUFFER_SIZE) !=ESP_FAIL)
+    {
+        resp_str = http_server_buffer; // Copy the JSON string to a local buffer
+        
+        esp_err_t ret = httpd_resp_send(req, resp_str, strlen(resp_str));
+        
+        if (ret != ESP_OK)
+        {
+            ESP_LOGE(TAG, "Simplified handler failed to send response: %s", esp_err_to_name(ret));
+        }
+
+        return ESP_OK;
     }
-    return ret;
+
+    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Unknown command");    
+
+    return ESP_OK;
 }
 
 // POST /api/rfid/cards - Add new card
