@@ -452,7 +452,7 @@ esp_err_t rfid_manager_get_card_list_json(char *buffer, size_t bufferMaxLength)
 
                 isComma = true;
                 //debug print statement
-                ESP_LOGI(TAG, "Adding Card %d", i+1);
+                ESP_LOGI(TAG, "Adding Card %d to JSON", i+1);
             }
         }
 
