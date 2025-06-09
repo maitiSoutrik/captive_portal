@@ -57,6 +57,12 @@ extern const char favicon_ico_end[] asm("_binary_favicon_ico_end");
 extern const char root_start[] asm("_binary_root_html_start");
 extern const char root_end[] asm("_binary_root_html_end");
 
+// RFID Management Webpage Files
+extern const char rfid_management_html_start[] asm("_binary_rfid_management_html_start");
+extern const char rfid_management_html_end[] asm("_binary_rfid_management_html_end");
+extern const char rfid_management_js_start[] asm("_binary_rfid_management_js_start");
+extern const char rfid_management_js_end[] asm("_binary_rfid_management_js_end");
+
 static char http_server_buffer[HTTP_SERVER_BUFFER_SIZE] = {0};
 
 static httpd_handle_t http_server_handle = NULL;
@@ -110,6 +116,10 @@ bool get_data_rsp_string(char *key, char *buffer, uint16_t len);
 static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req);
 static esp_err_t http_server_get_saved_station_ssid_handler(httpd_req_t *req);
 
+// RFID Management Webpage Handlers
+static esp_err_t http_server_rfid_management_html_handler(httpd_req_t *req);
+static esp_err_t http_server_rfid_management_js_handler(httpd_req_t *req);
+
 // RFID Management API Handlers
 static esp_err_t http_server_rfid_list_cards_handler(httpd_req_t *req);
 static esp_err_t http_server_rfid_add_card_handler(httpd_req_t *req);
@@ -132,6 +142,9 @@ static const httpd_uri_t uri_handlers[] = {
     {"/Sensor", HTTP_GET, http_server_sensor_handler, NULL},
     {"/wifiConnect", HTTP_POST, http_server_wifi_connect_handler, NULL},
     {"/getSavedStationSSID", HTTP_GET, http_server_get_saved_station_ssid_handler, NULL},
+    // RFID Management Webpage
+    {"/rfid_management.html", HTTP_GET, http_server_rfid_management_html_handler, NULL},
+    {"/rfid_management.js", HTTP_GET, http_server_rfid_management_js_handler, NULL},
     // RFID Endpoints
     {"/cards/Get", HTTP_GET, http_server_rfid_list_cards_handler, NULL},
     {"/cards/Add", HTTP_POST, http_server_rfid_add_card_handler, NULL},
@@ -962,6 +975,52 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
     }
 
     return send_err; // Return status of sending the response
+}
+
+// --- RFID Management Webpage Handlers ---
+
+/*
+ * Sends the rfid_management.html page
+ * @param req HTTP request for which the uri needs to be handled
+ * @return ESP_OK
+ */
+static esp_err_t http_server_rfid_management_html_handler(httpd_req_t *req)
+{
+    esp_err_t error;
+    ESP_LOGI(TAG, "RFID Management HTML Requested");
+    httpd_resp_set_type(req, "text/html");
+    error = httpd_resp_send(req, (const char *)rfid_management_html_start, rfid_management_html_end - rfid_management_html_start);
+    if (error != ESP_OK)
+    {
+        ESP_LOGE(TAG, "http_server_rfid_management_html_handler: Error %d while sending Response", error);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "http_server_rfid_management_html_handler: Response Sent Successfully");
+    }
+    return error;
+}
+
+/*
+ * rfid_management.js get handler requested when accessing the rfid management page.
+ * @param req HTTP request for which the uri needs to be handled
+ * @return ESP_OK
+ */
+static esp_err_t http_server_rfid_management_js_handler(httpd_req_t *req)
+{
+    esp_err_t error;
+    ESP_LOGI(TAG, "RFID Management JS Requested");
+    httpd_resp_set_type(req, "application/javascript");
+    error = httpd_resp_send(req, (const char *)rfid_management_js_start, rfid_management_js_end - rfid_management_js_start);
+    if (error != ESP_OK)
+    {
+        ESP_LOGE(TAG, "http_server_rfid_management_js_handler: Error %d while sending Response", error);
+    }
+    else
+    {
+        ESP_LOGI(TAG, "http_server_rfid_management_js_handler: Response Sent Successfully");
+    }
+    return error;
 }
 
 // --- RFID Management API Handlers ---

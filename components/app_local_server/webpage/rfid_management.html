@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFID Card Management</title>
+    <link rel="stylesheet" href="app.css">
+    <link rel="shortcut icon" href="favicon.ico" type="image/x-icon">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>RFID Card Management</h1>
+            <p><a href="index.html">Back to Home</a></p>
+        </header>
+
+        <div id="message-area" class="message-area" style="display: none;"></div>
+
+        <section id="card-count-section">
+            <h2>Card Count</h2>
+            <p>Total Active Cards: <span id="card-count">Loading...</span></p>
+            <button id="refresh-count-btn">Refresh Count</button>
+        </section>
+
+        <section id="list-cards-section">
+            <h2>Authorized RFID Cards</h2>
+            <button id="list-cards-btn">Load/Refresh Card List</button>
+            <table id="cards-table">
+                <thead>
+                    <tr>
+                        <th>Card ID</th>
+                        <th>Name</th>
+                        <th>Timestamp</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="cards-table-body">
+                    <!-- Card rows will be inserted here by JavaScript -->
+                </tbody>
+            </table>
+        </section>
+
+        <section id="add-card-section">
+            <h2>Add New RFID Card</h2>
+            <form id="add-card-form">
+                <div>
+                    <label for="card-id">Card ID (Number, e.g., 1234567890):</label>
+                    <input type="text" id="card-id" name="card-id" required pattern="[0-9]{1,10}">
+                </div>
+                <div>
+                    <label for="card-name">Cardholder Name:</label>
+                    <input type="text" id="card-name" name="card-name" maxlength="31" required>
+                </div>
+                <button type="submit">Add Card</button>
+            </form>
+        </section>
+
+        <section id="remove-card-by-id-section">
+            <h2>Remove Card by ID</h2>
+            <form id="remove-card-by-id-form">
+                <div>
+                    <label for="remove-card-id">Card ID (Number):</label>
+                    <input type="text" id="remove-card-id" name="remove-card-id" required pattern="[0-9]{1,10}">
+                </div>
+                <button type="submit" class="danger-btn">Remove This Card</button>
+            </form>
+        </section>
+
+        <section id="check-card-section">
+            <h2>Check Card Existence</h2>
+            <form id="check-card-form">
+                <div>
+                    <label for="check-card-id">Card ID (Number):</label>
+                    <input type="text" id="check-card-id" name="check-card-id" required pattern="[0-9]{1,10}">
+                </div>
+                <button type="submit">Check Existence</button>
+            </form>
+            <p>Status: <span id="check-card-status"></span></p>
+        </section>
+
+        <section id="reset-rfid-section">
+            <h2>Reset RFID Database</h2>
+            <p>This will clear all cards and load the default set.</p>
+            <button id="reset-rfid-btn" class="danger-btn">Reset to Defaults</button>
+        </section>
+
+        <footer>
+            <p>ESP32 Captive Portal</p>
+        </footer>
+    </div>
+
+    <script src="jquery-3.3.1.min.js"></script>
+    <script src="rfid_management.js"></script>
+</body>
+</html>

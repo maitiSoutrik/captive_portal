@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h" // For mutex
+#include <time.h>            // For time()
 // #include <inttypes.h> // PRIX32 not used, using %lx with cast instead
 
 static const char *TAG = "RFID_MANAGER";
@@ -322,9 +323,20 @@ bool rfid_manager_check_card(uint32_t card_id)
         { // Iterate all slots
             if (rfid_database[i].card_id == card_id && rfid_database[i].active)
             {
-                // Optionally update timestamp here if tracking last access
-                // rfid_database[i].timestamp = esp_log_timestamp(); // Or time(NULL)
-                // rfid_manager_save_to_file(); // If timestamp is updated
+                // Update timestamp on successful check
+                time_t now;
+                time(&now);
+                rfid_database[i].timestamp = (uint32_t)now;
+                ESP_LOGI(TAG, "Card %lu checked successfully. Timestamp updated to %lu.", (unsigned long)card_id, (unsigned long)rfid_database[i].timestamp);
+                
+                // Save the updated database to file
+                // WARNING: Frequent writes can wear out flash. Consider optimization for production.
+                esp_err_t save_err = rfid_manager_save_to_file();
+                if (save_err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to save database after timestamp update for card 0x%08lx.", (unsigned long)card_id);
+                    // Continue, but the timestamp update might not persist
+                }
+                
                 xSemaphoreGive(rfid_mutex);
                 return true;
             }
@@ -340,18 +352,31 @@ uint16_t rfid_manager_get_card_count(void)
 {
     // This can return the stored db_header.card_count if it's reliably updated.
     // Taking mutex for consistency, though it might be okay for a quick read if not critical.
-    uint16_t count = 0;
+    uint16_t active_count = 0;
     if (xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(2000)) == pdTRUE)
     {
-        count = db_header.card_count;
+        // Recalculate on demand to ensure accuracy
+        for (uint16_t i = 0; i < RFID_MAX_CARDS; ++i)
+        {
+            if (rfid_database[i].active && rfid_database[i].card_id != 0)
+            {
+                active_count++;
+            }
+        }
+        // Optionally, update db_header.card_count here if it was found to be out of sync,
+        // though add/remove should be keeping it correct.
+        // For now, just return the live calculated count.
+        // If db_header.card_count was critical for other logic, this might be a place to sync it.
+        // ESP_LOGD(TAG, "Recalculated active card count: %u (db_header.card_count was %u)", active_count, db_header.card_count);
+        // db_header.card_count = active_count; // If we decide to re-sync the header value
         xSemaphoreGive(rfid_mutex);
     }
     else
     {
-        ESP_LOGE(TAG, "Failed to take RFID mutex in get_card_count");
-        // Return a safe value or last known value.
+        ESP_LOGE(TAG, "Failed to take RFID mutex in get_card_count, returning 0");
+        // Return a safe value or last known value. Here, returning 0 on mutex failure.
     }
-    return count;
+    return active_count;
 }
 
 esp_err_t rfid_manager_list_cards(rfid_card_t *cards_buffer, uint16_t buffer_size, uint16_t *num_cards_copied)
@@ -429,17 +454,17 @@ esp_err_t rfid_manager_get_card_list_json(char *buffer, size_t bufferMaxLength)
 
         // clear the buffer
         memset(buffer, 0, bufferMaxLength);
-        
+
         // Prepare the JSON
         _length = snprintf(buffer, bufferMaxLength, "{\"cards\":[");
         
-        // loop over the available cards and add them to the JSON string
-        for (uint8_t i = 0; i < db_header.card_count; ++i)
+        // loop over all possible card slots and add active ones to the JSON string
+        for (uint16_t i = 0; i < RFID_MAX_CARDS; ++i) // Iterate up to RFID_MAX_CARDS
         {
-            // only do for active cards
-            if (rfid_database[i].active)
+            // only do for active cards that have a valid card_id
+            if (rfid_database[i].active && rfid_database[i].card_id != 0)
             {
-                if(_length + 80U >= bufferMaxLength)
+                if (_length + 80U >= bufferMaxLength)
                 {
                     ESP_LOGE(TAG, "Buffer too small for the JSON string");
                     xSemaphoreGive(rfid_mutex);
@@ -447,12 +472,12 @@ esp_err_t rfid_manager_get_card_list_json(char *buffer, size_t bufferMaxLength)
                 }
 
                 _length += snprintf(buffer + _length, bufferMaxLength - _length,
-                                   "%s{\"id\":%lu,\"nm\":\"%s\",\"ts\":%lu}",
-                                   isComma ? "," : "", rfid_database[i].card_id, rfid_database[i].name, rfid_database[i].timestamp);
+                                    "%s{\"id\":%lu,\"nm\":\"%s\",\"ts\":%lu}",
+                                    isComma ? "," : "", rfid_database[i].card_id, rfid_database[i].name, rfid_database[i].timestamp);
 
                 isComma = true;
-                //debug print statement
-                ESP_LOGI(TAG, "Adding Card %d to JSON", i+1);
+                // debug print statement
+                ESP_LOGI(TAG, "Adding Card %d to JSON", i + 1);
             }
         }
 
@@ -463,12 +488,12 @@ esp_err_t rfid_manager_get_card_list_json(char *buffer, size_t bufferMaxLength)
             xSemaphoreGive(rfid_mutex);
             return ESP_FAIL;
         }
-        
+
         _length += snprintf(buffer + _length, bufferMaxLength - _length, "]}");
 
         xSemaphoreGive(rfid_mutex);
     }
-    
+
     return ret;
 }
 
