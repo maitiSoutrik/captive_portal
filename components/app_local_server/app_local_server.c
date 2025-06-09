@@ -1063,7 +1063,6 @@ static esp_err_t http_server_rfid_add_card_handler(httpd_req_t *req)
 // DEL /api/rfid/cards/{id} - Remove card
 static esp_err_t http_server_rfid_remove_card_handler(httpd_req_t *req)
 {
-
     char urlBuffer[256];
     uint16_t lengthOfURI = 0;
     char idStrBuffer[48];
@@ -1095,8 +1094,8 @@ static esp_err_t http_server_rfid_remove_card_handler(httpd_req_t *req)
                 }
             }
 
+            }
         }
-    }
 
     esp_err_t ret = rfid_manager_remove_card(cardId);
 
@@ -1112,7 +1111,7 @@ static esp_err_t http_server_rfid_remove_card_handler(httpd_req_t *req)
     }
     else
     {
-        ESP_LOGE(TAG, "Failed to remove RFID card: %s", esp_err_to_name(ret));
+        ESP_LOGE(TAG, "Failed to remove RFID card: %s (Error: %s)", esp_err_to_name(ret), ret == ESP_FAIL ? "Generic Fail" : "Other");
         httpd_resp_send_500(req);
     }
     return ESP_OK;

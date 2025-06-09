@@ -258,7 +258,7 @@ esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
 
             db_header.card_count = active_count; // Update active card count
 
-            ESP_LOGI(TAG, "Added card 0x%08lx ('%s') at slot %u. Active cards: %u", (unsigned long)card_id, name, slot_to_add, db_header.card_count);
+            ESP_LOGI(TAG, "Added card %lu ('%s') at slot %u. Active cards: %u", (unsigned long)card_id, name, slot_to_add, db_header.card_count);
             esp_err_t save_ret = rfid_manager_save_to_file();
             xSemaphoreGive(rfid_mutex);
             return save_ret;
@@ -300,7 +300,7 @@ esp_err_t rfid_manager_remove_card(uint32_t card_id)
                 }
                 db_header.card_count = active_count;
 
-                ESP_LOGI(TAG, "Removed card 0x%08lx. Active cards: %u", (unsigned long)card_id, db_header.card_count);
+                ESP_LOGI(TAG, "Removed card %lu. Active cards: %u", (unsigned long)card_id, db_header.card_count);
                 esp_err_t save_ret = rfid_manager_save_to_file();
                 xSemaphoreGive(rfid_mutex);
                 return save_ret;
