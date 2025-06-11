@@ -1036,19 +1036,21 @@ static esp_err_t http_server_rfid_list_cards_handler(httpd_req_t *req)
 
     if (rfid_manager_get_card_list_json(http_server_buffer, HTTP_SERVER_BUFFER_SIZE) != ESP_FAIL)
     {
-        resp_str = http_server_buffer; // Copy the JSON string to a local buffer
-
-        esp_err_t ret = httpd_resp_send(req, resp_str, strlen(resp_str));
-
-        if (ret != ESP_OK)
-        {
-            ESP_LOGE(TAG, "Simplified handler failed to send response: %s", esp_err_to_name(ret));
-        }
-
-        return ESP_OK;
+        resp_str = http_server_buffer; // Assigning the address of buffer to pointer
+        
+        httpd_resp_set_status(req, HTTPD_200);
+    }
+    else
+    {
+        httpd_resp_set_status(req, HTTPD_400);
     }
 
-    httpd_resp_send_err(req, HTTPD_400_BAD_REQUEST, "Unknown command");
+    esp_err_t ret = httpd_resp_send(req, resp_str, strlen(resp_str));
+
+    if (ret != ESP_OK)
+    {
+        ESP_LOGE(TAG, "Simplified handler failed to send response: %s", esp_err_to_name(ret));
+    }
 
     return ESP_OK;
 }
@@ -1131,7 +1133,7 @@ static esp_err_t http_server_rfid_remove_card_handler(httpd_req_t *req)
 
     memset(idStrBuffer, 0, sizeof(idStrBuffer));
 
-    lengthOfURI = httpd_req_get_url_query_len(req) + 1;
+    lengthOfURI = httpd_req_get_url_query_len(req) + 1; // +1 for null terminator
 
     if(lengthOfURI > 1)
     {

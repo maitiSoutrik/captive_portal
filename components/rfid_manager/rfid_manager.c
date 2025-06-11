@@ -181,7 +181,9 @@ esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
                 strncpy(rfid_database[i].name, name, RFID_CARD_NAME_LEN - 1);
                 rfid_database[i].name[RFID_CARD_NAME_LEN - 1] = '\0'; // Ensure null termination
                 rfid_database[i].active = 1;
-                rfid_database[i].timestamp = 0; // Or update timestamp if needed
+                time_t now_update;
+                time(&now_update);
+                rfid_database[i].timestamp = (uint32_t)now_update; // Set current timestamp
                 esp_err_t save_ret = rfid_manager_save_to_file();
                 xSemaphoreGive(rfid_mutex);
                 return save_ret;
@@ -214,7 +216,9 @@ esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
             strncpy(rfid_database[slot_to_add].name, name, RFID_CARD_NAME_LEN - 1);
             rfid_database[slot_to_add].name[RFID_CARD_NAME_LEN - 1] = '\0';
             rfid_database[slot_to_add].active = 1;
-            rfid_database[slot_to_add].timestamp = 0; // Set current timestamp if needed
+            time_t now_add;
+            time(&now_add);
+            rfid_database[slot_to_add].timestamp = (uint32_t)now_add; // Set current timestamp
 
             // Increment card_count only if we are adding to a slot that was previously "empty"
             // in terms of the active card count. If we are reactivating an inactive card,
