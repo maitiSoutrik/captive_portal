@@ -10,20 +10,22 @@
 
 // RFID card structure
 // Size: 4 (card_id) + 1 (active) + 32 (name) + 4 (timestamp) = 41 bytes
-typedef struct {
-    uint32_t card_id;     // 32-bit RFID card number
-    uint8_t active;       // Card status (1=active, 0=inactive/removed)
+typedef struct
+{
+    uint32_t card_id;              // 32-bit RFID card number
+    uint8_t active;                // Card status (1=active, 0=inactive/removed)
     char name[RFID_CARD_NAME_LEN]; // Card holder name (ensure null-termination if shorter)
-    uint32_t timestamp;   // Last access timestamp (0 if not used)
+    uint32_t timestamp;            // Last access timestamp (0 if not used)
 } rfid_card_t;
 
 // RFID database header structure for file storage
 // Size: 2 (card_count) + 2 (max_cards) + 4 (checksum) + 4 (reserved) = 12 bytes
-typedef struct {
-    uint16_t card_count;  // Current number of active cards in the database
-    uint16_t max_cards;   // Maximum cards capacity (RFID_MAX_CARDS)
-    uint32_t checksum;    // Checksum of the card data (excluding the header itself)
-    uint32_t reserved;    // Reserved for future use
+typedef struct
+{
+    uint16_t card_count; // Current number of active cards in the database
+    uint16_t max_cards;  // Maximum cards capacity (RFID_MAX_CARDS)
+    uint32_t checksum;   // Checksum of the card data (excluding the header itself)
+    uint32_t reserved;   // Reserved for future use
 } rfid_db_header_t;
 
 /**
@@ -39,6 +41,8 @@ typedef struct {
  */
 esp_err_t rfid_manager_init(void);
 
+int testable_mean(const int *values, int count);
+
 /**
  * @brief Adds a new RFID card to the database.
  *
@@ -53,7 +57,7 @@ esp_err_t rfid_manager_init(void);
  * @return esp_err_t ESP_OK on success, ESP_ERR_NO_MEM if the database is full,
  *         ESP_FAIL for other errors.
  */
-esp_err_t rfid_manager_add_card(uint32_t card_id, const char* name);
+esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name);
 
 /**
  * @brief Removes an RFID card from the database.
@@ -68,6 +72,19 @@ esp_err_t rfid_manager_add_card(uint32_t card_id, const char* name);
  *         ESP_FAIL for other errors.
  */
 esp_err_t rfid_manager_remove_card(uint32_t card_id);
+
+/**
+ * @brief Retrieves an RFID card by its ID.
+ *
+ * Fetches the card details for the given card_id.
+ * If the card is not found or inactive, it will return an error.
+ *
+ * @param card_id The 32-bit ID of the RFID card to retrieve.
+ * @param card Pointer to a rfid_card_t structure where the card data will be stored.
+ * @return esp_err_t ESP_OK on success, ESP_ERR_NOT_FOUND if the card does not exist,
+ *         ESP_ERR_INVALID_ARG if card is NULL, ESP_FAIL for other errors.
+ */
+esp_err_t rfid_manager_get_card(uint32_t card_id, rfid_card_t *card);
 
 /**
  * @brief Checks if an RFID card is authorized.
@@ -110,8 +127,6 @@ esp_err_t rfid_manager_list_cards(rfid_card_t *cards_buffer, uint16_t buffer_siz
  */
 esp_err_t rfid_manager_format_database(void);
 
-
-esp_err_t rfid_manager_get_card_list_json(char* buffer, size_t bufferLength);
-
+esp_err_t rfid_manager_get_card_list_json(char *buffer, size_t bufferLength);
 
 #endif // RFID_MANAGER_H

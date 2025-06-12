@@ -2,7 +2,7 @@
     "C_Cpp.intelliSenseEngine": "default",
     "idf.espIdfPath": "/Users/soutrikmaiti/esp/v5.1.5/esp-idf",
     "idf.toolsPath": "/Users/soutrikmaiti/.espressif",
-    "idf.pythonInstallPath": "/opt/homebrew/bin/python3",
+    "idf.pythonInstallPath": "C:\\Users\\Bhupinder\\.espressif\\tools\\idf-python\\3.11.2\\python.exe",
     "idf.customExtraVars": {
         "IDF_TARGET": "esp32"
     },

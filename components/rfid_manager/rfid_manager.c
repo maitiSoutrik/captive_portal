@@ -98,6 +98,20 @@ static uint32_t calculate_checksum(const rfid_card_t *cards, uint16_t num_cards_
 
 // --- Core API Functions ---
 
+int testable_mean(const int *values, int count)
+{
+    if (count == 0)
+    {
+        return 0;
+    }
+    int sum = 0;
+    for (int i = 0; i < count; ++i)
+    {
+        sum += values[i];
+    }
+    return sum / count;
+}
+
 esp_err_t rfid_manager_init(void)
 {
     if (rfid_mutex == NULL)
@@ -276,6 +290,11 @@ esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
     return ESP_FAIL;
 }
 
+esp_err_t rfid_manager_get_card(uint32_t card_id, rfid_card_t *card)
+{
+    return ESP_FAIL;
+}
+
 esp_err_t rfid_manager_remove_card(uint32_t card_id)
 {
     if (xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(2000)) == pdTRUE)
@@ -429,17 +448,17 @@ esp_err_t rfid_manager_get_card_list_json(char *buffer, size_t bufferMaxLength)
 
         // clear the buffer
         memset(buffer, 0, bufferMaxLength);
-        
+
         // Prepare the JSON
         _length = snprintf(buffer, bufferMaxLength, "{\"cards\":[");
-        
+
         // loop over the available cards and add them to the JSON string
         for (uint8_t i = 0; i < db_header.card_count; ++i)
         {
             // only do for active cards
             if (rfid_database[i].active)
             {
-                if(_length + 80U >= bufferMaxLength)
+                if (_length + 80U >= bufferMaxLength)
                 {
                     ESP_LOGE(TAG, "Buffer too small for the JSON string");
                     xSemaphoreGive(rfid_mutex);
@@ -447,12 +466,12 @@ esp_err_t rfid_manager_get_card_list_json(char *buffer, size_t bufferMaxLength)
                 }
 
                 _length += snprintf(buffer + _length, bufferMaxLength - _length,
-                                   "%s{\"id\":%lu,\"nm\":\"%s\",\"ts\":%lu}",
-                                   isComma ? "," : "", rfid_database[i].card_id, rfid_database[i].name, rfid_database[i].timestamp);
+                                    "%s{\"id\":%lu,\"nm\":\"%s\",\"ts\":%lu}",
+                                    isComma ? "," : "", rfid_database[i].card_id, rfid_database[i].name, rfid_database[i].timestamp);
 
                 isComma = true;
-                //debug print statement
-                ESP_LOGI(TAG, "Adding Card %d to JSON", i+1);
+                // debug print statement
+                ESP_LOGI(TAG, "Adding Card %d to JSON", i + 1);
             }
         }
 
@@ -463,12 +482,12 @@ esp_err_t rfid_manager_get_card_list_json(char *buffer, size_t bufferMaxLength)
             xSemaphoreGive(rfid_mutex);
             return ESP_FAIL;
         }
-        
+
         _length += snprintf(buffer + _length, bufferMaxLength - _length, "]}");
 
         xSemaphoreGive(rfid_mutex);
     }
-    
+
     return ret;
 }
 
