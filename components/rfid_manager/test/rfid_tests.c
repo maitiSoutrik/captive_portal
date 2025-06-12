@@ -13,13 +13,13 @@
 
 #define countof(x) (sizeof(x) / sizeof(x[0]))
 
-TEST_CASE("RFID Manager: INIT", "ESP_OK")
+TEST_CASE("INIT", "[RFID]")
 {
     esp_err_t ret = rfid_manager_init();
     TEST_ASSERT_EQUAL(ESP_OK, ret);
 }
 
-TEST_CASE("RFID Manager: Adding Card", "ESP_OK")
+TEST_CASE("Adding Card", "[RFID]")
 {
 
     // Add a rfid card
@@ -27,7 +27,19 @@ TEST_CASE("RFID Manager: Adding Card", "ESP_OK")
     TEST_ASSERT_EQUAL(ESP_OK, ret);
 }
 
-TEST_CASE("RFID Manager: Getting Card", "ESP_OK")
+TEST_CASE("Adding 200 Card", "[RFID]")
+{
+    // Add 200 rfid cards
+    for (uint32_t i = 0; i < 200; ++i)
+    {
+        char name[RFID_CARD_NAME_LEN];
+        snprintf(name, sizeof(name), "Card %lu", i);
+        esp_err_t ret = rfid_manager_add_card(0x10000000 + i, name);
+        TEST_ASSERT_EQUAL(ESP_OK, ret);
+    }
+}
+
+TEST_CASE("Getting Card", "[RFID]")
 {
     // Check if the card was added correctly
     rfid_card_t card;
@@ -40,13 +52,13 @@ TEST_CASE("RFID Manager: Getting Card", "ESP_OK")
     TEST_ASSERT_EQUAL_UINT8(1, card.active);
 }
 
-TEST_CASE("Mean of an empty array is zero", "[mean]")
+TEST_CASE("Mean of an empty array is zero", "[RFID]")
 {
     const int values[] = {0};
     TEST_ASSERT_EQUAL(0, testable_mean(values, 0));
 }
 
-TEST_CASE("Mean of a test vector", "[mean]")
+TEST_CASE("Mean of a test vector", "[RFID]")
 {
     const int v[] = {1, 3, 5, 7, 9};
     TEST_ASSERT_EQUAL(5, testable_mean(v, countof(v)));

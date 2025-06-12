@@ -10,7 +10,7 @@ static const char *TAG = "RFID_MANAGER";
 
 #define RFID_DATABASE_FILE "/spiffs/rfid_cards.dat"
 
-// In-memory database for RFID cards
+// In-memory database for RFID cards (200*41= 8200 bytes)
 static rfid_card_t rfid_database[RFID_MAX_CARDS];
 
 static rfid_card_t temp_rfid_database[RFID_MAX_CARDS];
