@@ -70,6 +70,19 @@ esp_err_t rfid_manager_add_card(uint32_t card_id, const char* name);
 esp_err_t rfid_manager_remove_card(uint32_t card_id);
 
 /**
+ * @brief Retrieves an RFID card by its ID.
+ *
+ * Fetches the card details for the given card_id.
+ * If the card is not found or inactive, it will return an error.
+ *
+ * @param card_id The 32-bit ID of the RFID card to retrieve.
+ * @param card Pointer to a rfid_card_t structure where the card data will be stored.
+ * @return esp_err_t ESP_OK on success, ESP_ERR_NOT_FOUND if the card does not exist,
+ *         ESP_ERR_INVALID_ARG if card is NULL, ESP_FAIL for other errors.
+ */
+esp_err_t rfid_manager_get_card(uint32_t card_id, rfid_card_t *card);
+
+/**
  * @brief Checks if an RFID card is authorized.
  *
  * Verifies if the given card_id exists in the database and is marked as active.

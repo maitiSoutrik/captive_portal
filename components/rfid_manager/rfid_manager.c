@@ -352,6 +352,11 @@ bool rfid_manager_check_card(uint32_t card_id)
     return false; // Default to not authorized if mutex fails
 }
 
+esp_err_t rfid_manager_get_card(uint32_t card_id, rfid_card_t *card)
+{
+    return ESP_FAIL;
+}
+
 uint16_t rfid_manager_get_card_count(void)
 {
     // This can return the stored db_header.card_count if it's reliably updated.
