@@ -43,15 +43,19 @@ esp_err_t rfid_manager_init(void);
  * @brief Adds a new RFID card to the database.
  *
  * Adds the given card_id and name to the list of authorized cards.
- * If the card_id already exists, its name and active status might be updated.
+ * If a card with the same card_id already exists (either active or inactive),
+ * this function will return an error and will not modify the existing entry.
  * If the database is full, an error will be returned.
- * Changes are persisted to the storage file.
+ * Changes are persisted to the storage file if a new card is successfully added.
  *
- * @param card_id The 32-bit ID of the RFID card to add.
- * @param name Pointer to a string containing the name associated with the card.
+ * @param card_id The 32-bit ID of the RFID card to add. Must not be 0.
+ * @param name Pointer to a string containing the name associated with the card. Must not be NULL.
  *             The name will be truncated if longer than RFID_CARD_NAME_LEN-1.
- * @return esp_err_t ESP_OK on success, ESP_ERR_NO_MEM if the database is full,
- *         ESP_FAIL for other errors.
+ * @return esp_err_t ESP_OK on success.
+ *         ESP_ERR_INVALID_ARG if name is NULL or card_id is 0 (if 0 is considered invalid).
+ *         ESP_ERR_INVALID_STATE if the card_id already exists in the database.
+ *         ESP_ERR_NO_MEM if the database is full.
+ *         ESP_FAIL for other file operation errors.
  */
 esp_err_t rfid_manager_add_card(uint32_t card_id, const char* name);
 

@@ -173,20 +173,16 @@ esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
         }
 
         // Check if card already exists by iterating through all possible slots
+        // A card_id is considered to exist if it's present in any slot and is not 0 (which might indicate an uninitialized slot).
+        // This check prevents adding a card with an ID that is already in the system, regardless of its active status.
         for (uint16_t i = 0; i < RFID_MAX_CARDS; ++i)
         {
-            if (rfid_database[i].card_id == card_id)
-            { // Check if card_id matches
-                ESP_LOGI(TAG, "Card 0x%08lx already exists at slot %u. Updating name and ensuring active.", (unsigned long)card_id, i);
-                strncpy(rfid_database[i].name, name, RFID_CARD_NAME_LEN - 1);
-                rfid_database[i].name[RFID_CARD_NAME_LEN - 1] = '\0'; // Ensure null termination
-                rfid_database[i].active = 1;
-                time_t now_update;
-                time(&now_update);
-                rfid_database[i].timestamp = (uint32_t)now_update; // Set current timestamp
-                esp_err_t save_ret = rfid_manager_save_to_file();
+            if (rfid_database[i].card_id == card_id && rfid_database[i].card_id != 0)
+            {
+                ESP_LOGW(TAG, "Attempt to add card 0x%08lx which already exists at slot %u (status: %s). Operation aborted.",
+                         (unsigned long)card_id, i, rfid_database[i].active ? "active" : "inactive");
                 xSemaphoreGive(rfid_mutex);
-                return save_ret;
+                return ESP_ERR_INVALID_STATE; // Card ID already present in the database, operation invalid in this state
             }
         }
 
@@ -354,7 +350,42 @@ bool rfid_manager_check_card(uint32_t card_id)
 
 esp_err_t rfid_manager_get_card(uint32_t card_id, rfid_card_t *card)
 {
-    return ESP_FAIL;
+    if (card == NULL)
+    {
+        ESP_LOGE(TAG, "Output card pointer is NULL.");
+        return ESP_ERR_INVALID_ARG;
+    }
+
+    if (xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(2000)) == pdTRUE)
+    {
+        for (uint16_t i = 0; i < RFID_MAX_CARDS; ++i)
+        {
+            if (rfid_database[i].card_id == card_id)
+            {
+                if (rfid_database[i].active)
+                {
+                    *card = rfid_database[i]; // Copy the card data
+                    xSemaphoreGive(rfid_mutex);
+                    ESP_LOGI(TAG, "Card 0x%08lx found at slot %u.", (unsigned long)card_id, i);
+                    return ESP_OK;
+                }
+                else
+                {
+                    // Card found but is inactive
+                    ESP_LOGW(TAG, "Card 0x%08lx found at slot %u but is inactive.", (unsigned long)card_id, i);
+                    xSemaphoreGive(rfid_mutex);
+                    return ESP_ERR_NOT_FOUND; // Treat inactive as not found for "get active card" purposes
+                }
+            }
+        }
+        // Card ID not found in any slot
+        ESP_LOGW(TAG, "Card 0x%08lx not found in the database.", (unsigned long)card_id);
+        xSemaphoreGive(rfid_mutex);
+        return ESP_ERR_NOT_FOUND;
+    }
+
+    ESP_LOGE(TAG, "Failed to take RFID mutex in get_card");
+    return ESP_FAIL; // Mutex acquisition failed
 }
 
 uint16_t rfid_manager_get_card_count(void)

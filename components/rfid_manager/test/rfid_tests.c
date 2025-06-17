@@ -22,21 +22,38 @@ TEST_CASE("RFID Manager: INIT", "[rfid_manager]")
 
 TEST_CASE("RFID Manager: Adding Card", "[rfid_manager]")
 {
+    // Ensure a clean state by formatting the database (loads defaults)
+    esp_err_t format_ret = rfid_manager_format_database();
+    TEST_ASSERT_EQUAL(ESP_OK, format_ret);
 
-    // Add a rfid card
-    esp_err_t ret = rfid_manager_add_card(0x12345678, "Test Card");
-    TEST_ASSERT_EQUAL(ESP_OK, ret);
+    // Attempt to add a new card with a unique ID
+    esp_err_t ret = rfid_manager_add_card(0xABCDEFFF, "New Unique Card");
+    TEST_ASSERT_EQUAL(ESP_OK, ret); // This should succeed
+
+    // Attempt to add a card that already exists (default card ID 0x12345678)
+    // This should now fail with ESP_ERR_INVALID_STATE due to the fix
+    ret = rfid_manager_add_card(0x12345678, "Attempt to overwrite");
+    TEST_ASSERT_EQUAL(ESP_ERR_INVALID_STATE, ret);
+
+    // Attempt to add another new card to ensure the database is still functional
+    esp_err_t ret2 = rfid_manager_add_card(0x11223344, "Another New Card");
+    TEST_ASSERT_EQUAL(ESP_OK, ret2);
 }
 
 TEST_CASE("RFID Manager: Getting Card", "[rfid_manager]")
 {
+    // Ensure a clean state by formatting the database for this test too,
+    // so we know what to expect for "Admin Card" (0x12345678)
+    esp_err_t format_ret = rfid_manager_format_database();
+    TEST_ASSERT_EQUAL(ESP_OK, format_ret);
+
     // Check if the card was added correctly
     rfid_card_t card;
     esp_err_t ret = rfid_manager_get_card(0x12345678, &card);
     TEST_ASSERT_EQUAL(ESP_OK, ret);
 
     TEST_ASSERT_EQUAL_UINT32(0x12345678, card.card_id);
-    TEST_ASSERT_EQUAL_STRING("Test Card", card.name);
+    TEST_ASSERT_EQUAL_STRING("Admin Card", card.name); // Corrected expected name
 
     TEST_ASSERT_EQUAL_UINT8(1, card.active);
 }
