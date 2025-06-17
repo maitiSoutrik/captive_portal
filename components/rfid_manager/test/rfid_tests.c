@@ -58,17 +58,33 @@ TEST_CASE("RFID Manager: Getting Card", "[rfid_manager]")
     TEST_ASSERT_EQUAL_UINT8(1, card.active);
 }
 
-// Add a test to add 200 cards and benchmark time
-// TEST_CASE("RFID Manager: Benchmarking Time", "[rfid_manager]")
-// {
-//     // Add 200 cards
-//     for (int i = 0; i < RFID_MAX_CARDS; i++)
-//     {
-//         rfid_card_t card;
-//         card.card_id = i + 1;
-//         strcpy(card.name, "Test Card");
-//         card.active = 1;
-//         esp_err_t ret = rfid_manager_add_card(card.card_id, card.name);
-//         TEST_ASSERT_EQUAL(ESP_OK, ret);
-//     }
-// }
+TEST_CASE("RFID Manager: Fill Database (Performance/Stress)", "[rfid_manager]")
+{
+    esp_err_t ret;
+
+    // Ensure a clean state by formatting the database (loads defaults)
+    ret = rfid_manager_format_database();
+    TEST_ASSERT_EQUAL(ESP_OK, ret);
+
+    uint16_t initial_card_count = rfid_manager_get_card_count();
+
+    char card_name[RFID_CARD_NAME_LEN];
+    uint32_t base_card_id = 0x20000000; // Base ID for new cards to avoid collision with defaults
+
+    for (uint16_t i = 0; i < (RFID_MAX_CARDS - initial_card_count); ++i)
+    {
+        uint32_t current_card_id = base_card_id + i;
+        snprintf(card_name, RFID_CARD_NAME_LEN, "StressCard %u", i);
+        
+        ret = rfid_manager_add_card(current_card_id, card_name);
+        // Removed ESP_LOGE for brevity in tests, focusing on assertion
+        TEST_ASSERT_EQUAL(ESP_OK, ret);
+    }
+
+    uint16_t final_card_count = rfid_manager_get_card_count();
+    TEST_ASSERT_EQUAL_UINT16(RFID_MAX_CARDS, final_card_count);
+
+    // Attempt to add one more card, should fail with ESP_ERR_NO_MEM
+    ret = rfid_manager_add_card(base_card_id + RFID_MAX_CARDS, "Overflow Card");
+    TEST_ASSERT_EQUAL(ESP_ERR_NO_MEM, ret);
+}

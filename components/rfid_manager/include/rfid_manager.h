@@ -90,6 +90,10 @@ esp_err_t rfid_manager_get_card(uint32_t card_id, rfid_card_t *card);
  * @brief Checks if an RFID card is authorized.
  *
  * Verifies if the given card_id exists in the database and is marked as active.
+ * If the card is found and active, its timestamp is updated in the in-memory database.
+ * NOTE: This timestamp update is NOT immediately persisted to the file system
+ * to reduce flash wear and improve performance. It will be persisted upon the next
+ * explicit save operation (e.g., when adding or removing a card).
  *
  * @param card_id The 32-bit ID of the RFID card to check.
  * @return true if the card is authorized and active, false otherwise.

@@ -326,16 +326,12 @@ bool rfid_manager_check_card(uint32_t card_id)
                 // Update timestamp on successful check
                 time_t now;
                 time(&now);
-                rfid_database[i].timestamp = (uint32_t)now;
-                ESP_LOGI(TAG, "Card %lu checked successfully. Timestamp updated to %lu.", (unsigned long)card_id, (unsigned long)rfid_database[i].timestamp);
+                rfid_database[i].timestamp = (uint32_t)now; // Update timestamp in RAM
+                ESP_LOGI(TAG, "Card %lu checked successfully. Timestamp updated in RAM to %lu.", (unsigned long)card_id, (unsigned long)rfid_database[i].timestamp);
                 
-                // Save the updated database to file
-                // WARNING: Frequent writes can wear out flash. Consider optimization for production.
-                esp_err_t save_err = rfid_manager_save_to_file();
-                if (save_err != ESP_OK) {
-                    ESP_LOGE(TAG, "Failed to save database after timestamp update for card 0x%08lx.", (unsigned long)card_id);
-                    // Continue, but the timestamp update might not persist
-                }
+                // NOTE: Removed rfid_manager_save_to_file() here to reduce flash wear and improve performance.
+                // The timestamp update will only be in RAM until the next explicit save operation (e.g., add/remove card).
+                // If persistent timestamps on every check are critical, a different strategy is needed.
                 
                 xSemaphoreGive(rfid_mutex);
                 return true;
