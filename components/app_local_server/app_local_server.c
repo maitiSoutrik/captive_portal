@@ -34,7 +34,7 @@
 #define HTTP_SERVER_RECEIVE_WAIT_TIMEOUT (10u) // in seconds
 #define HTTP_SERVER_SEND_WAIT_TIMEOUT (10u)    // in seconds
 #define HTTP_SERVER_MONITOR_QUEUE_LEN (3u)
-#define HTTP_SERVER_BUFFER_SIZE (3 * 1024u)
+#define HTTP_SERVER_BUFFER_SIZE (16 * 1024u) // Increased from 3KB to 16KB for larger JSON payloads
 #define OTA_UPDATE_PENDING (0)
 #define OTA_UPDATE_SUCCESSFUL (1)
 #define OTA_UPDATE_FAILED (-1)
