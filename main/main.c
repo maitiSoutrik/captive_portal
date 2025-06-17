@@ -44,8 +44,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing NVS storage");
     nvs_storage_init(); // nvs_storage_init returns void
     
-    ESP_LOGI(TAG, "Testing NVS custom partition");
-    nvs_custom_partition_test(); // Test the custom NVS functions
+    // ESP_LOGI(TAG, "Testing NVS custom partition");
+    // nvs_custom_partition_test(); // Test the custom NVS functions
 
     ESP_LOGI(TAG, "Initializing network interface");
     ESP_ERROR_CHECK(esp_netif_init());
@@ -61,9 +61,9 @@ void app_main(void)
     ESP_ERROR_CHECK(rfid_manager_init());
     
     /* Test storage functionality */
-    ESP_LOGI(TAG, "Testing SPI FFS storage");
-    spi_ffs_storage_test();
-    spi_ffs_storage_test_all_functions();
+    // ESP_LOGI(TAG, "Testing SPI FFS storage");
+    // spi_ffs_storage_test();
+    // spi_ffs_storage_test_all_functions();
     
     /* Initialize and configure WiFi */
     ESP_LOGI(TAG, "Initializing WiFi component");
