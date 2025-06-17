@@ -11,8 +11,13 @@
 #include "unity.h"
 #include "rfid_manager.h"
 #include <string.h>
+#include <stdio.h> // For FILE operations (fopen, fwrite, fclose) for corruption test
 
 #define countof(x) (sizeof(x) / sizeof(x[0]))
+// Define a known number of default cards for assertion, based on rfid_manager.c
+// This is a bit fragile if default_cards array changes size without updating test.
+// A better way would be to list cards and check for specific default cards.
+#define NUM_DEFAULT_CARDS 3
 
 TEST_CASE("RFID Manager: INIT", "[rfid_manager]")
 {
@@ -87,4 +92,66 @@ TEST_CASE("RFID Manager: Fill Database (Performance/Stress)", "[rfid_manager]")
     // Attempt to add one more card, should fail with ESP_ERR_NO_MEM
     ret = rfid_manager_add_card(base_card_id + RFID_MAX_CARDS, "Overflow Card");
     TEST_ASSERT_EQUAL(ESP_ERR_NO_MEM, ret);
+}
+
+TEST_CASE("RFID Manager: File Corruption and Recovery", "[rfid_manager]")
+{
+    esp_err_t ret;
+
+    // 1. Initial setup: Initialize and create a known (non-default) file state
+    // Ensure SPIFFS is up and rfid_manager can run.
+    // The first rfid_manager_init() might have run from a previous test if tests share state,
+    // or if this is the first test in a fresh run.
+    // Formatting ensures we start from a known point (defaults).
+    ret = rfid_manager_format_database(); 
+    TEST_ASSERT_EQUAL(ESP_OK, ret);
+
+    // Add a custom card to make the current rfid_cards.dat distinct from the final default state
+    uint32_t custom_card_id = 0xDDCCBBAA;
+    const char* custom_card_name = "CustomCorruptTest";
+    ret = rfid_manager_add_card(custom_card_id, custom_card_name);
+    TEST_ASSERT_EQUAL(ESP_OK, ret); // This saves the file with the custom card
+
+    // Verify custom card exists and count is NUM_DEFAULT_CARDS + 1
+    rfid_card_t temp_card;
+    ret = rfid_manager_get_card(custom_card_id, &temp_card);
+    TEST_ASSERT_EQUAL(ESP_OK, ret);
+    TEST_ASSERT_EQUAL_STRING(custom_card_name, temp_card.name);
+    TEST_ASSERT_EQUAL_UINT16(NUM_DEFAULT_CARDS + 1, rfid_manager_get_card_count());
+
+    // 2. Programmatically corrupt the rfid_cards.dat file
+    const char* filepath = "/spiffs/rfid_cards.dat";
+    FILE* f = fopen(filepath, "wb"); // Open in write binary, truncates/overwrites the file
+    TEST_ASSERT_NOT_NULL(f);         // Ensure file opened successfully
+    
+    if (f) {
+        char garbage_data[] = "corrupted_file_data_to_trigger_error";
+        size_t written_count = fwrite(garbage_data, 1, sizeof(garbage_data) - 1, f);
+        TEST_ASSERT_EQUAL_UINT(sizeof(garbage_data) - 1, written_count);
+        int fclose_ret = fclose(f);
+        TEST_ASSERT_EQUAL(0, fclose_ret);
+    } else {
+        TEST_FAIL_MESSAGE("Failed to open rfid_cards.dat for corruption part of the test.");
+    }
+
+    // 3. Re-initialize the RFID manager.
+    // This call to rfid_manager_init() should detect the corruption (e.g. checksum mismatch or parse error)
+    // and then call rfid_manager_load_defaults().
+    // The rfid_manager_init() itself should return ESP_OK if recovery by loading defaults is successful.
+    ret = rfid_manager_init(); 
+    TEST_ASSERT_EQUAL(ESP_OK, ret);
+
+    // 4. Verify recovery to default state
+    // Check that the custom card is no longer found
+    ret = rfid_manager_get_card(custom_card_id, &temp_card);
+    TEST_ASSERT_EQUAL(ESP_ERR_NOT_FOUND, ret);
+
+    // Check that a known default card IS present (e.g., 0x12345678 "Admin Card")
+    uint32_t default_admin_card_id = 0x12345678; // Assuming this is a default card
+    ret = rfid_manager_get_card(default_admin_card_id, &temp_card);
+    TEST_ASSERT_EQUAL(ESP_OK, ret);
+    TEST_ASSERT_EQUAL_STRING("Admin Card", temp_card.name); // Assuming this is its name
+
+    // Verify the card count is back to the number of default cards
+    TEST_ASSERT_EQUAL_UINT16(NUM_DEFAULT_CARDS, rfid_manager_get_card_count());
 }
