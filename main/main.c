@@ -23,6 +23,7 @@
 #include "dns_server.h"
 #include "nvs_storage.h"
 #include "spi_ffs_storage.h"
+#include "rfid_manager.h" // Added for RFID Management
 #include "custom_partition.h" // Added for custom NVS partition testing
 
 #define EXAMPLE_ESP_WIFI_AP_SSID CONFIG_ESP_WIFI_AP_SSID
@@ -43,8 +44,8 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing NVS storage");
     nvs_storage_init(); // nvs_storage_init returns void
     
-    ESP_LOGI(TAG, "Testing NVS custom partition");
-    nvs_custom_partition_test(); // Test the custom NVS functions
+    // ESP_LOGI(TAG, "Testing NVS custom partition");
+    // nvs_custom_partition_test(); // Test the custom NVS functions
 
     ESP_LOGI(TAG, "Initializing network interface");
     ESP_ERROR_CHECK(esp_netif_init());
@@ -55,11 +56,14 @@ void app_main(void)
     /* Initialize storage systems */
     ESP_LOGI(TAG, "Initializing SPI FFS storage");
     ESP_ERROR_CHECK(spi_ffs_storage_init());
+
+    ESP_LOGI(TAG, "Initializing RFID Manager");
+    ESP_ERROR_CHECK(rfid_manager_init());
     
     /* Test storage functionality */
-    ESP_LOGI(TAG, "Testing SPI FFS storage");
-    spi_ffs_storage_test();
-    spi_ffs_storage_test_all_functions();
+    // ESP_LOGI(TAG, "Testing SPI FFS storage");
+    // spi_ffs_storage_test();
+    // spi_ffs_storage_test_all_functions();
     
     /* Initialize and configure WiFi */
     ESP_LOGI(TAG, "Initializing WiFi component");
