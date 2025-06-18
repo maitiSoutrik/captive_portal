@@ -162,6 +162,7 @@ esp_err_t rfid_manager_init(void)
     }
 }
 
+#ifdef UNIT_TEST
 void rfid_manager_set_cache_write_timeout(uint32_t timeout_ms)
 {
     if (rfid_mutex != NULL && xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
@@ -185,6 +186,8 @@ void rfid_manager_set_cache_write_timeout(uint32_t timeout_ms)
         ESP_LOGE(TAG, "Failed to take RFID mutex in set_cache_write_timeout. Timeout not changed.");
     }
 }
+#endif // UNIT_TEST
+
 esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
 {
     if (rfid_mutex != NULL && xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(2000)) == pdTRUE)
