@@ -11,7 +11,7 @@
 #include <string.h>
 #include "unity.h"
 
-#include "esp_task_wdt.h"
+// #include "esp_task_wdt.h"
 
 #include "esp_log.h"
 #include "spi_ffs_storage.h"
@@ -25,7 +25,7 @@ void app_main(void)
 
     // Disable the watchdog timer to prevent it from resetting the system
     // during the test execution, especially when using unity_run_menu().
-    esp_task_wdt_delete(NULL); // Delete the task watchdog for the current task
+    // esp_task_wdt_delete(NULL); // Delete the task watchdog for the current task
 
     /* These are the different ways of running registered tests.
      * In practice, only one of them is usually needed.
@@ -54,7 +54,7 @@ void app_main(void)
     ESP_LOGI(TAG, "Initializing SPI FFS storage");
     ESP_ERROR_CHECK(spi_ffs_storage_init());
 
-    unity_run_all_tests();
+    // unity_run_all_tests();
 
     UNITY_END();
 
@@ -62,7 +62,7 @@ void app_main(void)
     /* This function will not return, and will be busy waiting for UART input.
      * Make sure that task watchdog is disabled if you use this function.
      */
-    // unity_run_menu();
+    unity_run_menu();
 }
 
 static void print_banner(const char *text)

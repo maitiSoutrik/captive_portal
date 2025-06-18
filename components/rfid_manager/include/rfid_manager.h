@@ -17,15 +17,6 @@ typedef struct {
     uint32_t timestamp;   // Last access timestamp (0 if not used)
 } rfid_card_t;
 
-// RFID database header structure for file storage
-// Size: 2 (card_count) + 2 (max_cards) + 4 (checksum) + 4 (reserved) = 12 bytes
-typedef struct {
-    uint16_t card_count;  // Current number of active cards in the database
-    uint16_t max_cards;   // Maximum cards capacity (RFID_MAX_CARDS)
-    uint32_t checksum;    // Checksum of the card data (excluding the header itself)
-    uint32_t reserved;    // Reserved for future use
-} rfid_db_header_t;
-
 /**
  * @brief Initializes the RFID manager.
  *

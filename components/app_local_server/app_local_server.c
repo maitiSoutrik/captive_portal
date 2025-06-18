@@ -959,7 +959,7 @@ static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
 
     // Respond to client (original response logic)
     char response_buf[100]; // Renamed from 'response' to avoid conflict if it's a global
-    uint16_t rsp_len = snprintf(response_buf, sizeof(response_buf), "\"ssid\":\"%s\",\"pswd_saved\":\"%s\"", ssid, (save_err == ESP_OK) ? "ok" : "failed");
+    uint16_t rsp_len = snprintf(response_buf, sizeof(response_buf), "{\"ssid\":\"%s\",\"pswd_saved\":\"%s\"}", ssid, (save_err == ESP_OK) ? "ok" : "failed");
 
     httpd_resp_set_type(req, "application/json");
 
@@ -1116,7 +1116,9 @@ static esp_err_t http_server_rfid_add_card_handler(httpd_req_t *req)
     else
     {
         ESP_LOGE(TAG, "Failed to add RFID card: %s", esp_err_to_name(ret));
-        httpd_resp_send_500(req);
+        httpd_resp_set_status(req, "409 Duplicate Item");
+        httpd_resp_set_type(req, "application/json");           // Set content type
+        httpd_resp_send(req, "{\"status\":\"error\"}", HTTPD_RESP_USE_STRLEN);
     }
     return ESP_OK;
 }
