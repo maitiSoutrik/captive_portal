@@ -540,13 +540,50 @@ esp_err_t app_wifi_disconnect_sta(void)
     return ESP_OK;
 }
 
+esp_err_t app_wifi_get_current_sta_ssid(char *ssid_buffer, size_t buffer_len)
+{
+    if (!s_wifi_ctx.initialized || !s_wifi_ctx.started) {
+        ESP_LOGW(TAG, "WiFi not initialized or not started, cannot get STA SSID.");
+        if (buffer_len > 0) ssid_buffer[0] = '\0';
+        return ESP_ERR_WIFI_NOT_STARTED;
+    }
 
+    if (ssid_buffer == NULL || buffer_len == 0) {
+        return ESP_ERR_INVALID_ARG;
+    }
 
+    // Ensure buffer is initially empty
+    ssid_buffer[0] = '\0'; 
 
+    xSemaphoreTake(s_wifi_ctx.mutex, portMAX_DELAY);
 
+    esp_err_t ret = ESP_FAIL; // Default to failure
 
+    if (s_wifi_ctx.sta_status == APP_WIFI_STATUS_CONNECTED) {
+        wifi_config_t wifi_config;
+        ret = esp_wifi_get_config(WIFI_IF_STA, &wifi_config);
 
+        if (ret == ESP_OK) {
+            if (strlen((char *)wifi_config.sta.ssid) > 0) {
+                strncpy(ssid_buffer, (char *)wifi_config.sta.ssid, buffer_len - 1);
+                ssid_buffer[buffer_len - 1] = '\0'; // Ensure null termination
+                ESP_LOGI(TAG, "Current STA SSID from esp_wifi_get_config: %s", ssid_buffer);
+            } else {
+                ESP_LOGW(TAG, "esp_wifi_get_config STA SSID is empty, though status is connected.");
+                // Consider if ESP_ERR_WIFI_SSID_NOT_FOUND is defined or if ESP_FAIL is better
+                ret = ESP_FAIL; // Using ESP_FAIL as a generic failure for empty SSID
+            }
+        } else {
+            ESP_LOGE(TAG, "Failed to get STA config via esp_wifi_get_config: %s", esp_err_to_name(ret));
+        }
+    } else {
+        ESP_LOGI(TAG, "Not currently connected to a station. STA status: %d", s_wifi_ctx.sta_status);
+        ret = ESP_ERR_WIFI_NOT_CONNECT; // Indicate not connected
+    }
 
+    xSemaphoreGive(s_wifi_ctx.mutex);
+    return ret;
+}
 /* Private function implementations */
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)

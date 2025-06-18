@@ -629,9 +629,23 @@ static esp_err_t http_server_ota_status_handler(httpd_req_t *req)
 
 static esp_err_t http_server_ssid_handler(httpd_req_t *req)
 {
+    char ssid_buffer[33] = {0}; // SSID max 32 chars + null terminator
     char ssid_json[100];
-    ESP_LOGI(TAG, "SSID Requested");
-    sprintf(ssid_json, "{\"ssid\":\"%s\"}", CONFIG_ESP_WIFI_SSID);
+    esp_err_t ret_ssid_get;
+
+    ESP_LOGI(TAG, "SSID Requested (for currently connected AP by http_server_ssid_handler)");
+
+    ret_ssid_get = app_wifi_get_current_sta_ssid(ssid_buffer, sizeof(ssid_buffer));
+
+    if (ret_ssid_get == ESP_OK && strlen(ssid_buffer) > 0)
+    {
+        sprintf(ssid_json, "{\"ssid\":\"%s\"}", ssid_buffer);
+    }
+    else
+    {
+        ESP_LOGW(TAG, "Failed to get current STA SSID or not connected. Status: %s. Sending empty SSID.", esp_err_to_name(ret_ssid_get));
+        sprintf(ssid_json, "{\"ssid\":\"\"}");
+    }
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, ssid_json, strlen(ssid_json));
