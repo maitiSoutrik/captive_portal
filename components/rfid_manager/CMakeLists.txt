@@ -23,7 +23,7 @@ set(COMPONENT_ADD_INCLUDEDIRS "include")
 
 idf_component_register(SRCS "${COMPONENT_SRCS}"
                     INCLUDE_DIRS "${COMPONENT_ADD_INCLUDEDIRS}"
-                    REQUIRES spi_ffs_storage log freertos)
+                    REQUIRES spi_ffs_storage log freertos nvs_flash esp_timer)
 # Note: 'spi_ffs_storage' is listed as a dependency in the issue.
 # If it's a custom component, ensure its name is correct.
 # If it's part of ESP-IDF or another library, adjust accordingly.

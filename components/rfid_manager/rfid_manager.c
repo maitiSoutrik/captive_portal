@@ -5,6 +5,7 @@
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h" // For mutex
 #include <time.h>            // For time()
+#include "esp_timer.h"       // For esp_timer functions
 // #include <inttypes.h> // PRIX32 not used, using %lx with cast instead
 
 static const char *TAG = "RFID_MANAGER";
@@ -16,6 +17,17 @@ static rfid_card_t rfid_database[RFID_MAX_CARDS];
 
 // Mutex for thread-safe access to the database and file operations
 static SemaphoreHandle_t rfid_mutex = NULL;
+
+// --- Caching Mechanism ---
+static bool is_dirty = false; // Flag to indicate pending NVS write
+static esp_timer_handle_t rfid_write_timer = NULL; // Timer for delayed NVS write
+
+#define RFID_WRITE_TIMEOUT_MS (5000) // 5 seconds, adjust as needed
+#define RFID_WRITE_TIMEOUT_US_NORMAL (RFID_WRITE_TIMEOUT_MS * 1000ULL)
+
+// Default to normal timeout, can be overridden for tests by rfid_manager_set_cache_write_timeout
+static uint64_t s_rfid_current_write_timeout_us = RFID_WRITE_TIMEOUT_US_NORMAL; 
+// --- End Caching Mechanism ---
 
 // Default RFID cards
 static const rfid_card_t default_cards[] = {
@@ -60,6 +72,13 @@ static esp_err_t rfid_manager_save_to_file(void);
  */
 static esp_err_t rfid_manager_load_from_file(void);
 
+/**
+ * @brief Handles the timeout for cache write operations.
+ * @param arg The argument passed when creating
+ * the cache write task.
+ * @return void
+ */
+static void rfid_cache_write_timeout_handler(void* arg); // Added for completeness
 
 // --- Core API Functions ---
 
@@ -115,6 +134,24 @@ esp_err_t rfid_manager_init(void)
             }
         }
 
+        // Initialize caching mechanism state and create the timer
+        is_dirty = false;
+        if (rfid_write_timer == NULL) { // Create timer only if it hasn't been created
+            esp_timer_create_args_t timer_args = {
+                .callback = &rfid_cache_write_timeout_handler,
+                .name = "rfid_write_timer"
+                // .arg = NULL; // Not passing any specific arg to handler
+            };
+            esp_err_t timer_create_ret = esp_timer_create(&timer_args, &rfid_write_timer);
+            if (timer_create_ret != ESP_OK) {
+                ESP_LOGE(TAG, "Failed to create rfid_write_timer: %s", esp_err_to_name(timer_create_ret));
+                // If timer creation fails, init should indicate a failure for the caching system.
+                xSemaphoreGive(rfid_mutex);
+                return ESP_FAIL; 
+            }
+            ESP_LOGI(TAG, "RFID write timer created successfully.");
+        }
+
         xSemaphoreGive(rfid_mutex);
         return ret; // Return status of load_from_file or load_defaults
     }
@@ -125,6 +162,29 @@ esp_err_t rfid_manager_init(void)
     }
 }
 
+void rfid_manager_set_cache_write_timeout(uint32_t timeout_ms)
+{
+    if (rfid_mutex != NULL && xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+    {
+        if (timeout_ms > 0)
+        {
+            s_rfid_current_write_timeout_us = (uint64_t)timeout_ms * 1000ULL;
+            ESP_LOGI(TAG, "RFID cache write timeout updated to %llu us (%lu ms)", s_rfid_current_write_timeout_us, (unsigned long)timeout_ms);
+        }
+        else
+        {
+            // Optionally, reset to default if timeout_ms is 0, or just log an error/warning.
+            // For now, let's assume 0 means "use default".
+            s_rfid_current_write_timeout_us = RFID_WRITE_TIMEOUT_US_NORMAL;
+            ESP_LOGI(TAG, "RFID cache write timeout reset to default %llu us", s_rfid_current_write_timeout_us);
+        }
+        xSemaphoreGive(rfid_mutex);
+    }
+    else
+    {
+        ESP_LOGE(TAG, "Failed to take RFID mutex in set_cache_write_timeout. Timeout not changed.");
+    }
+}
 esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
 {
     if (rfid_mutex != NULL && xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(2000)) == pdTRUE)
@@ -181,11 +241,35 @@ esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
 
             ESP_LOGI(TAG, "Added card %lu ('%s') at slot %u.", (unsigned long)card_id, name, _index_of_first_inactive_slot);
 
-            esp_err_t save_ret = rfid_manager_save_to_file();
+            // Caching logic:
+            is_dirty = true;
+            ESP_LOGI(TAG, "RFID data marked dirty.");
+
+            if (rfid_write_timer != NULL) {
+                // Stop the timer if it's already running to reset the timeout period
+                esp_err_t stop_err = esp_timer_stop(rfid_write_timer);
+                if (stop_err != ESP_OK && stop_err != ESP_ERR_INVALID_STATE) {
+                    // ESP_ERR_INVALID_STATE means timer was not running, which is fine.
+                    ESP_LOGW(TAG, "Failed to stop rfid_write_timer: %s", esp_err_to_name(stop_err));
+                }
+
+                // Start the one-shot timer
+                esp_err_t start_err = esp_timer_start_once(rfid_write_timer, s_rfid_current_write_timeout_us);
+                if (start_err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to start rfid_write_timer: %s. Data will not be auto-saved by timer.", esp_err_to_name(start_err));
+                    // If timer fails to start, data remains dirty. Consider fallback or error propagation.
+                    // For now, the operation is successful in memory.
+                } else {
+                    ESP_LOGI(TAG, "RFID write timer started for %llu us.", s_rfid_current_write_timeout_us);
+                }
+            } else {
+                ESP_LOGE(TAG, "rfid_write_timer is NULL. Cannot start timer. Data will not be auto-saved.");
+                // This case should ideally not happen if init was successful.
+            }
 
             xSemaphoreGive(rfid_mutex);
 
-            return save_ret;
+            return ESP_OK; // Card added to in-memory cache successfully
         }
         else
         {
@@ -213,10 +297,29 @@ esp_err_t rfid_manager_remove_card(uint32_t card_id)
                 // memset(rfid_database[i].name, 0, RFID_CARD_NAME_LEN);
                 // rfid_database[i].timestamp = 0;
 
-                ESP_LOGI(TAG, "Removed card %lu.", (unsigned long)card_id);
-                esp_err_t save_ret = rfid_manager_save_to_file();
+                ESP_LOGI(TAG, "Removed card %lu (marked inactive in memory).", (unsigned long)card_id);
+                
+                // Caching logic:
+                is_dirty = true;
+                ESP_LOGI(TAG, "RFID data marked dirty due to card removal.");
+
+                if (rfid_write_timer != NULL) {
+                    esp_err_t stop_err = esp_timer_stop(rfid_write_timer);
+                    if (stop_err != ESP_OK && stop_err != ESP_ERR_INVALID_STATE) {
+                    ESP_LOGW(TAG, "Failed to stop rfid_write_timer: %s", esp_err_to_name(stop_err));
+                }
+                esp_err_t start_err = esp_timer_start_once(rfid_write_timer, s_rfid_current_write_timeout_us);
+                if (start_err != ESP_OK) {
+                    ESP_LOGE(TAG, "Failed to start rfid_write_timer for removal: %s.", esp_err_to_name(start_err));
+                } else {
+                    ESP_LOGI(TAG, "RFID write timer started for %llu us after removal.", s_rfid_current_write_timeout_us);
+                }
+            } else {
+                ESP_LOGE(TAG, "rfid_write_timer is NULL during removal. Cannot start timer.");
+                }
+
                 xSemaphoreGive(rfid_mutex);
-                return save_ret;
+                return ESP_OK; // Card marked inactive in memory successfully
             }
         }
         ESP_LOGW(TAG, "Card 0x%08lx not found or already inactive.", (unsigned long)card_id);
@@ -359,8 +462,19 @@ esp_err_t rfid_manager_list_cards(rfid_card_t *cards_buffer, uint16_t buffer_siz
 
 esp_err_t rfid_manager_format_database(void)
 {
+    // Ensure mutex is created, similar to rfid_manager_init()
+    // This makes format_database safer if called before init or if mutex was somehow lost.
+    if (rfid_mutex == NULL) {
+        rfid_mutex = xSemaphoreCreateMutex();
+        if (rfid_mutex == NULL) {
+            ESP_LOGE(TAG, "Failed to create RFID mutex in format_database's check");
+            return ESP_FAIL; // Cannot proceed without mutex
+        }
+    }
+
     esp_err_t ret = ESP_FAIL;
-    if (rfid_mutex != NULL && xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(5000)) == pdTRUE) // Longer timeout for format
+    // Now, rfid_mutex is guaranteed to be non-NULL if the above check passed.
+    if (xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(5000)) == pdTRUE)
     {
         ESP_LOGW(TAG, "Formatting RFID database. All existing cards will be erased and defaults loaded.");
         // Essentially, just load defaults, which will overwrite the file.
@@ -372,6 +486,7 @@ esp_err_t rfid_manager_format_database(void)
     else
     {
         ESP_LOGE(TAG, "Failed to take RFID mutex in format_database");
+        // ret is already ESP_FAIL from initialization
     }
     return ret;
 }
@@ -533,4 +648,26 @@ static esp_err_t rfid_manager_load_from_file(void)
     return ESP_OK;
 }
 
-
+static void rfid_cache_write_timeout_handler(void* arg) {
+    ESP_LOGI(TAG, "RFID write timer expired.");
+    // Attempt to take the mutex before accessing shared resources
+    if (rfid_mutex != NULL && xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(1000)) == pdTRUE) { // Shorter timeout for callback
+        if (is_dirty) {
+            ESP_LOGI(TAG, "is_dirty is true, writing cached RFID data to NVS...");
+            esp_err_t err = rfid_manager_save_to_file();
+            if (err == ESP_OK) {
+                is_dirty = false;
+                ESP_LOGI(TAG, "Successfully wrote RFID data to NVS.");
+            } else {
+                ESP_LOGE(TAG, "Failed to write RFID data to NVS from timer: %s", esp_err_to_name(err));
+                // Consider: What to do if save fails? Retry? For now, is_dirty remains true.
+            }
+        } else {
+            ESP_LOGI(TAG, "is_dirty is false, no NVS write needed from timer.");
+        }
+        xSemaphoreGive(rfid_mutex);
+    } else {
+        ESP_LOGE(TAG, "Failed to take RFID mutex in timer callback. NVS write deferred.");
+        // If this happens, data remains dirty and will attempt to save on next timer expiry or deinit.
+    }
+}
