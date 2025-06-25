@@ -30,6 +30,8 @@ typedef struct {
  */
 esp_err_t rfid_manager_init(void);
 
+bool rfid_manager_process(void);
+
 /**
  * @brief Adds a new RFID card to the database.
  *
@@ -125,16 +127,10 @@ esp_err_t rfid_manager_format_database(void);
 
 esp_err_t rfid_manager_get_card_list_json(char* buffer, size_t bufferLength);
 
-#ifdef UNIT_TEST
-/**
- * @brief Sets the cache write timeout for testing purposes.
- *
- * Allows unit tests to use a shorter timeout for the RFID cache write-back timer.
- * Should typically be called in the test's setUp function.
- *
- * @param timeout_ms The timeout in milliseconds. If 0, it might reset to default (optional behavior).
- */
-void rfid_manager_set_cache_write_timeout(uint32_t timeout_ms);
-#endif // UNIT_TEST
+
+esp_err_t rfid_manager_deinit(void);
+
+
+
 
 #endif // RFID_MANAGER_H

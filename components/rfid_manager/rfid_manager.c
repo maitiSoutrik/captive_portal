@@ -4,6 +4,7 @@
 #include "esp_log.h"
 #include "freertos/FreeRTOS.h"
 #include "freertos/semphr.h" // For mutex
+#include "freertos/timers.h"
 #include <time.h>            // For time()
 #include "esp_timer.h"       // For esp_timer functions
 // #include <inttypes.h> // PRIX32 not used, using %lx with cast instead
@@ -21,6 +22,7 @@ static SemaphoreHandle_t rfid_mutex = NULL;
 // --- Caching Mechanism ---
 static bool is_dirty = false; // Flag to indicate pending NVS write
 static esp_timer_handle_t rfid_write_timer = NULL; // Timer for delayed NVS write
+static bool is_ready_to_write = false;
 
 #define RFID_WRITE_TIMEOUT_MS (5000) // 5 seconds, adjust as needed
 #define RFID_WRITE_TIMEOUT_US_NORMAL (RFID_WRITE_TIMEOUT_MS * 1000ULL)
@@ -79,6 +81,8 @@ static esp_err_t rfid_manager_load_from_file(void);
  * @return void
  */
 static void rfid_cache_write_timeout_handler(void* arg); // Added for completeness
+
+static esp_err_t rfid_manager_write_into_memory(void);
 
 // --- Core API Functions ---
 
@@ -162,31 +166,20 @@ esp_err_t rfid_manager_init(void)
     }
 }
 
-#ifdef UNIT_TEST
-void rfid_manager_set_cache_write_timeout(uint32_t timeout_ms)
+bool rfid_manager_process(void)
 {
-    if (rfid_mutex != NULL && xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(100)) == pdTRUE)
+    if (is_ready_to_write)
     {
-        if (timeout_ms > 0)
+        esp_err_t write_into_ret = rfid_manager_write_into_memory();
+
+        if(write_into_ret == ESP_OK)
         {
-            s_rfid_current_write_timeout_us = (uint64_t)timeout_ms * 1000ULL;
-            ESP_LOGI(TAG, "RFID cache write timeout updated to %llu us (%lu ms)", s_rfid_current_write_timeout_us, (unsigned long)timeout_ms);
+            is_ready_to_write = false;
         }
-        else
-        {
-            // Optionally, reset to default if timeout_ms is 0, or just log an error/warning.
-            // For now, let's assume 0 means "use default".
-            s_rfid_current_write_timeout_us = RFID_WRITE_TIMEOUT_US_NORMAL;
-            ESP_LOGI(TAG, "RFID cache write timeout reset to default %llu us", s_rfid_current_write_timeout_us);
-        }
-        xSemaphoreGive(rfid_mutex);
     }
-    else
-    {
-        ESP_LOGE(TAG, "Failed to take RFID mutex in set_cache_write_timeout. Timeout not changed.");
-    }
+
+    return true;
 }
-#endif // UNIT_TEST
 
 esp_err_t rfid_manager_add_card(uint32_t card_id, const char *name)
 {
@@ -651,7 +644,15 @@ static esp_err_t rfid_manager_load_from_file(void)
     return ESP_OK;
 }
 
-static void rfid_cache_write_timeout_handler(void* arg) {
+static void rfid_cache_write_timeout_handler(void* arg)
+{
+    is_ready_to_write = true;
+}
+
+static esp_err_t rfid_manager_write_into_memory(void)
+{
+    esp_err_t write_into_mem_ret = ESP_OK;
+
     ESP_LOGI(TAG, "RFID write timer expired.");
     // Attempt to take the mutex before accessing shared resources
     if (rfid_mutex != NULL && xSemaphoreTake(rfid_mutex, pdMS_TO_TICKS(1000)) == pdTRUE) { // Shorter timeout for callback
@@ -664,13 +665,33 @@ static void rfid_cache_write_timeout_handler(void* arg) {
             } else {
                 ESP_LOGE(TAG, "Failed to write RFID data to NVS from timer: %s", esp_err_to_name(err));
                 // Consider: What to do if save fails? Retry? For now, is_dirty remains true.
+                write_into_mem_ret = ESP_FAIL;
             }
-        } else {
-            ESP_LOGI(TAG, "is_dirty is false, no NVS write needed from timer.");
         }
         xSemaphoreGive(rfid_mutex);
     } else {
         ESP_LOGE(TAG, "Failed to take RFID mutex in timer callback. NVS write deferred.");
         // If this happens, data remains dirty and will attempt to save on next timer expiry or deinit.
+        write_into_mem_ret = ESP_FAIL;
     }
+
+    return write_into_mem_ret;
+}
+
+esp_err_t rfid_manager_deinit(void)
+{
+    // Deinit the RFID manager component
+    // stop the timer handler if only its running
+    if (rfid_write_timer != NULL)
+    {
+        esp_timer_stop(rfid_write_timer);
+        esp_timer_delete(rfid_write_timer);
+        rfid_write_timer = NULL;
+    }
+
+    vSemaphoreDelete(rfid_mutex);
+    rfid_mutex = NULL;
+
+    // return success
+    return ESP_OK;
 }
