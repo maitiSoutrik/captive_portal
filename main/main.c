@@ -117,6 +117,8 @@ void app_main(void)
         // If an error occurs within, it's logged by the component.
         // If it were critical, we would do: ESP_ERROR_CHECK_WITHOUT_ABORT(app_local_server_process()); or handle it.
         app_local_server_process();
+
+        rfid_manager_process();
         
         /* Small delay to prevent watchdog timeout */
         vTaskDelay(pdMS_TO_TICKS(1000));

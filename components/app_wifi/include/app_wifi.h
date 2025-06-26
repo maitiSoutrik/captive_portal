@@ -127,6 +127,18 @@ esp_err_t app_wifi_connect_sta(const char *ssid, const char *password);
  */
 esp_err_t app_wifi_disconnect_sta(void);
 
+/**
+ * @brief Get the SSID of the currently connected station.
+ *
+ * If connected, this function populates the provided buffer with the SSID
+ * of the access point the ESP32 is currently connected to.
+ *
+ * @param[out] ssid_buffer Buffer to store the SSID.
+ * @param[in] buffer_len Length of the ssid_buffer.
+ * @return ESP_OK if connected and SSID is retrieved, ESP_FAIL or other error codes otherwise.
+ */
+esp_err_t app_wifi_get_current_sta_ssid(char *ssid_buffer, size_t buffer_len);
+
 #ifdef __cplusplus
 }
 #endif

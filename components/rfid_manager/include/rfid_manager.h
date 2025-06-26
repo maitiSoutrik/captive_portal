@@ -30,6 +30,8 @@ typedef struct {
  */
 esp_err_t rfid_manager_init(void);
 
+bool rfid_manager_process(void);
+
 /**
  * @brief Adds a new RFID card to the database.
  *
@@ -124,6 +126,11 @@ esp_err_t rfid_manager_format_database(void);
 
 
 esp_err_t rfid_manager_get_card_list_json(char* buffer, size_t bufferLength);
+
+
+esp_err_t rfid_manager_deinit(void);
+
+
 
 
 #endif // RFID_MANAGER_H

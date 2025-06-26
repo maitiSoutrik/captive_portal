@@ -12,5 +12,9 @@ set(EXTRA_COMPONENT_DIRS "../components")
 #
 set(TEST_COMPONENTS "rfid_manager" CACHE STRING "List of components to test")
 
+# Define UNIT_TEST for the entire test project so that conditional compilation
+# in component headers (like rfid_manager.h) works as expected when included by test files.
+add_compile_definitions(UNIT_TEST)
+
 include($ENV{IDF_PATH}/tools/cmake/project.cmake)
 project(unit_test_test)
