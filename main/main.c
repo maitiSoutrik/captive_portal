@@ -145,16 +145,7 @@ static void wifi_event_callback(app_wifi_status_t status, void *user_data)
                 // Number of connected stations logging removed as app_wifi_get_connected_stations was removed.
             }
             break;
-        case APP_WIFI_STATUS_AP_CLIENT_CONNECTED:
-            ESP_LOGI(TAG, "AP client connected");
-            rgb_led_ap_client_connected();
-            break;
-
-        case APP_WIFI_STATUS_AP_CLIENT_DISCONNECTED:
-            ESP_LOGI(TAG, "AP client disconnected");
-            rgb_led_ap_client_disconnected();
-            break;
-            
+           
         case APP_WIFI_STATUS_DISCONNECTED:
             ESP_LOGI(TAG, "WiFi station disconnected");
             break;
