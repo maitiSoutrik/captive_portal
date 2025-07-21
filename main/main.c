@@ -25,6 +25,7 @@
 #include "spi_ffs_storage.h"
 #include "rfid_manager.h" // Added for RFID Management
 #include "custom_partition.h" // Added for custom NVS partition testing
+#include "rgb_led.h"
 
 #define EXAMPLE_ESP_WIFI_AP_SSID CONFIG_ESP_WIFI_AP_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_AP_PASSWORD
@@ -38,6 +39,7 @@ static void time_sync_callback(app_time_sync_status_t status, time_t current_tim
 
 void app_main(void)
 {
+    rgb_led_wifi_app_started();
     ESP_LOGI(TAG, "Starting Captive Portal Application");
 
     /* Initialize core systems */
@@ -97,6 +99,7 @@ void app_main(void)
     /* Start DNS server */
     ESP_LOGI(TAG, "Starting DNS server");
     ESP_ERROR_CHECK(start_dns_server());
+    rgb_led_http_server_started();
     
     /* Log startup completion */
     // AP IP logging removed as app_wifi_get_ap_ip was removed. 
@@ -137,11 +140,12 @@ static void wifi_event_callback(app_wifi_status_t status, void *user_data)
         case APP_WIFI_STATUS_CONNECTED:
             {
                 ESP_LOGI(TAG, "WiFi station connected successfully");
+                rgb_led_wifi_connected();
                 // STA IP is logged by app_wifi component on IP_EVENT_STA_GOT_IP.
                 // Number of connected stations logging removed as app_wifi_get_connected_stations was removed.
             }
             break;
-            
+           
         case APP_WIFI_STATUS_DISCONNECTED:
             ESP_LOGI(TAG, "WiFi station disconnected");
             break;
