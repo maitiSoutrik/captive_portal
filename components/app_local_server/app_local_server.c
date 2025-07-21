@@ -26,6 +26,7 @@
 // #include "app_station.h" // Replaced by app_wifi.h (implicitly included via app_local_server.h or directly if needed)
 #include "app_wifi.h"     // Ensure app_wifi component is included for app_wifi_connect_sta
 #include "rfid_manager.h" // For RFID card management
+#include "dht22_sensor.h"
 
 // DEFINES
 #define URI_HANDLER_MARGIN (1u)
@@ -110,8 +111,8 @@ static esp_err_t http_server_sensor_handler(httpd_req_t *req); // Add prototype 
 static esp_err_t start_webserver(void);                        // Changed return type
 static void get_local_time_string(char *time_str, size_t len);
 static void get_local_time_string_utc(char *time_str, size_t len);
-static int16_t get_temperature(void);
-static int16_t get_humidity(void);
+static float get_temperature(void);
+static float get_humidity(void);
 bool get_data_rsp_string(char *key, char *buffer, uint16_t len);
 static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req);
 static esp_err_t http_server_get_saved_station_ssid_handler(httpd_req_t *req);
@@ -341,8 +342,7 @@ static esp_err_t http_server_sensor_handler(httpd_req_t *req)
     ESP_LOGI(TAG, "Sensor Data Requested");
 
     // Prepare JSON response
-    // Assuming get_temperature() and get_humidity() return int16_t
-    snprintf(sensor_json, sizeof(sensor_json), "{\"temp\":\"%d\",\"humidity\":\"%d\"}", get_temperature(), get_humidity());
+    snprintf(sensor_json, sizeof(sensor_json), "{\"temp\":\"%.1f\",\"humidity\":\"%.1f\"}", get_temperature(), get_humidity());
 
     httpd_resp_set_type(req, "application/json");
     httpd_resp_send(req, sensor_json, strlen(sensor_json));
@@ -866,11 +866,11 @@ bool get_data_rsp_string(char *key, char *buffer, uint16_t len)
     }
     else if (strstr(key, "Temp") != NULL)
     {
-        snprintf(buffer, len, "\"Temp\":\"%d\"", get_temperature()); // Placeholder for temperature
+        snprintf(buffer, len, "\"Temp\":\"%.1f\"", get_temperature());
     }
     else if (strstr(key, "Humidity") != NULL)
     {
-        snprintf(buffer, len, "\"Humidity\":\"%d\"", get_humidity()); // Placeholder for humidity
+        snprintf(buffer, len, "\"Humidity\":\"%.1f\"", get_humidity());
     }
     else if (strstr(key, "UTC") != NULL)
     {
@@ -908,16 +908,14 @@ bool get_data_rsp_string(char *key, char *buffer, uint16_t len)
     return true;
 }
 
-static int16_t get_temperature(void)
+static float get_temperature(void)
 {
-    // return random number between 0 & 100
-    return (rand() % 100);
+    return dht22_get_temperature();
 }
 
-static int16_t get_humidity(void)
+static float get_humidity(void)
 {
-    // return random number between 0 & 100
-    return (rand() % 100);
+    return dht22_get_humidity();
 }
 
 static esp_err_t http_server_wifi_connect_handler(httpd_req_t *req)
