@@ -53,11 +53,15 @@ static void rgb_led_pwm_init(void)
 	ledc_timer_config_t ledc_timer =
 	{
 		.duty_resolution	= LEDC_TIMER_8_BIT,
-		.freq_hz			= 100,
+		.freq_hz			= 5000,
 		.speed_mode			= LEDC_HIGH_SPEED_MODE,
 		.timer_num			= LEDC_TIMER_0
 	};
-	ledc_timer_config(&ledc_timer);
+	esp_err_t ret = ledc_timer_config(&ledc_timer);
+	if (ret != ESP_OK) {
+		// Handle timer configuration error
+		return;
+	}
 
 	// Configure channels
 	for (rgb_ch = 0; rgb_ch < RGB_LED_CHANNEL_NUM; rgb_ch++)
@@ -72,7 +76,11 @@ static void rgb_led_pwm_init(void)
 			.speed_mode = ledc_ch[rgb_ch].mode,
 			.timer_sel	= ledc_ch[rgb_ch].timer_index,
 		};
-		ledc_channel_config(&ledc_channel);
+		esp_err_t ret = ledc_channel_config(&ledc_channel);
+		if (ret != ESP_OK) {
+			// Handle channel configuration error
+			return;
+		}
 	}
 
 	g_pwm_init_handle = true;
@@ -94,51 +102,44 @@ static void rgb_led_set_color(uint8_t red, uint8_t green, uint8_t blue)
 	ledc_update_duty(ledc_ch[2].mode, ledc_ch[2].channel);
 }
 
-void rgb_led_wifi_app_started(void)
+/**
+ * @brief Ensures PWM is initialized and sets the color.
+ * 
+ * @param red 
+ * @param green 
+ * @param blue 
+ */
+static void rgb_led_ensure_init_and_set_color(uint8_t red, uint8_t green, uint8_t blue)
 {
 	if (g_pwm_init_handle == false)
 	{
 		rgb_led_pwm_init();
 	}
+	rgb_led_set_color(red, green, blue);
+}
 
-	rgb_led_set_color(RGB_COLOR_PURPLE);
+void rgb_led_wifi_app_started(void)
+{
+	rgb_led_ensure_init_and_set_color(RGB_COLOR_PURPLE);
 }
 
 void rgb_led_http_server_started(void)
 {
-	if (g_pwm_init_handle == false)
-	{
-		rgb_led_pwm_init();
-	}
-
-	rgb_led_set_color(RGB_COLOR_CYAN);
+	rgb_led_ensure_init_and_set_color(RGB_COLOR_CYAN);
 }
 
 
 void rgb_led_wifi_connected(void)
 {
-	if (g_pwm_init_handle == false)
-	{
-		rgb_led_pwm_init();
-	}
-
-	rgb_led_set_color(RGB_COLOR_BLUE);
+	rgb_led_ensure_init_and_set_color(RGB_COLOR_BLUE);
 }
 
 void rgb_led_ap_client_connected(void)
 {
-    if (g_pwm_init_handle == false)
-    {
-        rgb_led_pwm_init();
-    }
-    rgb_led_set_color(RGB_COLOR_YELLOW); // Yellow
+    rgb_led_ensure_init_and_set_color(RGB_COLOR_YELLOW); // Yellow
 }
 
 void rgb_led_ap_client_disconnected(void)
 {
-	if (g_pwm_init_handle == false)
-	{
-		rgb_led_pwm_init();
-	}
-	rgb_led_set_color(RGB_COLOR_RED); // Red
+	rgb_led_ensure_init_and_set_color(RGB_COLOR_RED); // Red
 }
