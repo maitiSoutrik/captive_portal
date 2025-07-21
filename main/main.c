@@ -26,6 +26,7 @@
 #include "rfid_manager.h" // Added for RFID Management
 #include "custom_partition.h" // Added for custom NVS partition testing
 #include "rgb_led.h"
+#include "dht22_sensor.h"
 
 #define EXAMPLE_ESP_WIFI_AP_SSID CONFIG_ESP_WIFI_AP_SSID
 #define EXAMPLE_ESP_WIFI_PASS CONFIG_ESP_WIFI_AP_PASSWORD
@@ -61,6 +62,9 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Initializing RFID Manager");
     ESP_ERROR_CHECK(rfid_manager_init());
+
+    ESP_LOGI(TAG, "Initializing DHT22 Sensor");
+    ESP_ERROR_CHECK(dht22_init());
     
     /* Test storage functionality */
     // ESP_LOGI(TAG, "Testing SPI FFS storage");
