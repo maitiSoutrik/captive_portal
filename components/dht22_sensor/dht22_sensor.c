@@ -98,13 +98,15 @@ static void dht22_task(void *pvParameters)
             uint8_t checksum = data[0] + data[1] + data[2] + data[3];
             if (checksum == data[4])
             {
+                portENTER_CRITICAL(&dht22_mux);
                 humidity = (data[0] << 8 | data[1]) / 10.0f;
                 temperature = ((data[2] & 0x7F) << 8 | data[3]) / 10.0f;
                 if (data[2] & 0x80)
                 {
                     temperature *= -1;
                 }
-                ESP_LOGI(TAG, "Humidity: %.1f%%, Temperature: %.1fC", humidity, temperature);
+                portEXIT_CRITICAL(&dht22_mux);
+                // ESP_LOGI(TAG, "Humidity: %.1f%%, Temperature: %.1fC", humidity, temperature);
             }
             else
             {
@@ -122,16 +124,28 @@ static void dht22_task(void *pvParameters)
 esp_err_t dht22_init(void)
 {
     gpio_reset_pin(DHT22_GPIO);
-    xTaskCreate(dht22_task, "dht22_task", 2048, NULL, 5, NULL);
+    BaseType_t task_result = xTaskCreate(dht22_task, "dht22_task", 2048, NULL, 5, NULL);
+    if (task_result != pdPASS) {
+        ESP_LOGE(TAG, "Failed to create dht22_task");
+        return ESP_FAIL;
+    }
     return ESP_OK;
 }
 
 float dht22_get_temperature(void)
 {
-    return temperature;
+    float temp;
+    portENTER_CRITICAL(&dht22_mux);
+    temp = temperature;
+    portEXIT_CRITICAL(&dht22_mux);
+    return temp;
 }
 
 float dht22_get_humidity(void)
 {
-    return humidity;
+    float hum;
+    portENTER_CRITICAL(&dht22_mux);
+    hum = humidity;
+    portEXIT_CRITICAL(&dht22_mux);
+    return hum;
 }
