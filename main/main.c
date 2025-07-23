@@ -17,6 +17,7 @@
 #include "esp_event.h"
 
 // Component includes
+#include "aws_iot.h"
 #include "app_wifi.h"
 #include "app_time_sync.h"
 #include "app_local_server.h"

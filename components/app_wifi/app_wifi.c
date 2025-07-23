@@ -23,6 +23,7 @@
 #include "nvs_storage.h"
 #include "nvs_flash.h" // Added for NVS error codes
 #include "app_wifi.h"
+#include "aws_iot.h"
 
 /* Constants */
 #define TAG "app_wifi"
@@ -632,6 +633,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
                 
             case WIFI_EVENT_STA_CONNECTED:
                 ESP_LOGI(TAG, "Connected to AP");
+                aws_iot_start(); // Start AWS IoT after successful connection
                 break;
                 
             default:
