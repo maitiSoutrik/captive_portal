@@ -166,7 +166,8 @@ void aws_iot_task(void *param) {
     rc = aws_iot_mqtt_autoreconnect_set_status(&client, true);
     if(SUCCESS != rc) {
         ESP_LOGE(TAG, "Unable to set Auto Reconnect to true - %d", rc);
-        abort();
+        vTaskDelete(NULL);
+        return;
     }
 
     const char *TOPIC = "test_topic/esp32";
@@ -177,7 +178,8 @@ void aws_iot_task(void *param) {
     rc = aws_iot_mqtt_subscribe(&client, TOPIC, TOPIC_LEN, QOS0, iot_subscribe_callback_handler, NULL);
     if(SUCCESS != rc) {
         ESP_LOGE(TAG, "Error subscribing : %d ", rc);
-        abort();
+        vTaskDelete(NULL);
+        return;
     }
 
     sprintf(cPayload, "%s : %ld ", "hello from SDK", i);
@@ -215,7 +217,7 @@ void aws_iot_task(void *param) {
     }
 
     ESP_LOGE(TAG, "An error occurred in the main loop.");
-    abort();
+    vTaskDelete(NULL);
 }
 
 esp_err_t aws_iot_start(void)
