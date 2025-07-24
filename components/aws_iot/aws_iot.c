@@ -39,16 +39,16 @@
 #include "driver/sdmmc_host.h"
 
 #include "aws_iot.h"
-#include "DHT22.h"
+#include "dht22_sensor.h"
 #include "nvs.h"
 #include "nvs_flash.h"
-#include "tasks_common.h"
-#include "wifi_app.h"
+// #include "tasks_common.h"
+#include "app_wifi.h"
 
-// #include "aws_iot_config.h"
-// #include "aws_iot_log.h"
-// #include "aws_iot_version.h"
-// #include "aws_iot_mqtt_client_interface.h"
+#include "aws_iot_config.h"
+#include "aws_iot_log.h"
+#include "aws_iot_version.h"
+#include "aws_iot_mqtt_client_interface.h"
 
 static const char *TAG = "aws_iot";
 
@@ -80,7 +80,7 @@ uint32_t port = AWS_IOT_MQTT_PORT;
 
 void iot_subscribe_callback_handler(AWS_IoT_Client *pClient, char *topicName, uint16_t topicNameLen,
                                     IoT_Publish_Message_Params *params, void *pData) {
-    ESP_LOGI(TAG, "Subscribe callback Test: %.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
+    ESP_LOGI(TAG, "Subscribe callback: %.*s\t%.*s", topicNameLen, topicName, (int) params->payloadLen, (char *)params->payload);
 }
 
 void disconnectCallbackHandler(AWS_IoT_Client *pClient, void *data) {
@@ -172,6 +172,7 @@ void aws_iot_task(void *param) {
     const int TOPIC_LEN = strlen(TOPIC);
 
     ESP_LOGI(TAG, "Subscribing...");
+    ESP_LOGI(TAG, "Subscribing to %s", TOPIC);
     rc = aws_iot_mqtt_subscribe(&client, TOPIC, TOPIC_LEN, QOS0, iot_subscribe_callback_handler, NULL);
     if(SUCCESS != rc) {
         ESP_LOGE(TAG, "Error subscribing : %d ", rc);
@@ -199,11 +200,11 @@ void aws_iot_task(void *param) {
 
         ESP_LOGI(TAG, "Stack remaining for task '%s' is %d bytes", pcTaskGetName(NULL), uxTaskGetStackHighWaterMark(NULL));
         vTaskDelay(3000 / portTICK_PERIOD_MS);
-        sprintf(cPayload, "%s : %d ", "WiFi RSSI", wifi_app_get_rssi());
-        paramsQOS0.payloadLen = strlen(cPayload);
-        rc = aws_iot_mqtt_publish(&client, TOPIC, TOPIC_LEN, &paramsQOS0);
+        // sprintf(cPayload, "%s : %d ", "WiFi RSSI", wifi_app_get_rssi());
+        // paramsQOS0.payloadLen = strlen(cPayload);
+        // rc = aws_iot_mqtt_publish(&client, TOPIC, TOPIC_LEN, &paramsQOS0);
 
-        sprintf(cPayload, "%s : %.1f, %s : %.1f", "Temperature", getTemperature(), "Humidity", getHumidity());
+        sprintf(cPayload, "{\"temperature\": %.1f, \"humidity\": %.1f}", dht22_get_temperature(), dht22_get_humidity());
         paramsQOS1.payloadLen = strlen(cPayload);
         rc = aws_iot_mqtt_publish(&client, TOPIC, TOPIC_LEN, &paramsQOS1);
         if (rc == MQTT_REQUEST_TIMEOUT_ERROR) {

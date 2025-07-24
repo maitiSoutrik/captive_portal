@@ -24,6 +24,7 @@
 #include "nvs_flash.h" // Added for NVS error codes
 #include "app_wifi.h"
 #include "aws_iot.h"
+#include "rgb_led.h"
 
 /* Constants */
 #define TAG "app_wifi"
@@ -270,6 +271,7 @@ esp_err_t app_wifi_start(void)
     s_wifi_ctx.started = true;
     xSemaphoreGive(s_wifi_ctx.mutex);
 
+    rgb_led_wifi_app_started();
     ESP_LOGI(TAG, "WiFi started successfully");
     return ESP_OK;
 }
@@ -633,7 +635,7 @@ static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t e
                 
             case WIFI_EVENT_STA_CONNECTED:
                 ESP_LOGI(TAG, "Connected to AP");
-                aws_iot_start(); // Start AWS IoT after successful connection
+                rgb_led_wifi_connected();
                 break;
                 
             default:
