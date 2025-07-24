@@ -5,21 +5,23 @@
 #include "freertos/task.h"
 
 // Helper function to initialize and wait for sensor readings
-static void setup_sensor(void)
+static esp_err_t setup_sensor(void)
 {
     static bool initialized = false;
+    static esp_err_t status = ESP_OK;
     if (!initialized)
     {
-        TEST_ASSERT_EQUAL(ESP_OK, dht22_init());
-        // Wait for the sensor to perform a few readings
-        vTaskDelay(pdMS_TO_TICKS(10000));
+        status = dht22_init();
+        // Shorter delay for unit tests
+        vTaskDelay(pdMS_TO_TICKS(500));
         initialized = true;
     }
+    return status;
 }
 
 TEST_CASE("dht22 sensor reads temperature data", "[dht22]")
 {
-    setup_sensor();
+    TEST_ASSERT_EQUAL(ESP_OK, setup_sensor());
 
     // Error handling: simulate or check for sensor read failure (if possible)
     float temp = dht22_get_temperature();
@@ -50,7 +52,7 @@ TEST_CASE("dht22 sensor reads temperature data", "[dht22]")
 
 TEST_CASE("dht22 sensor reads humidity data", "[dht22]")
 {
-    setup_sensor();
+    TEST_ASSERT_EQUAL(ESP_OK, setup_sensor());
     float hum = dht22_get_humidity();
     printf("Humidity: %.1f%%\n", hum);
 

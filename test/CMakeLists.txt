@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.16)
 
 # Include the components directory of the main application:
 #
-set(EXTRA_COMPONENT_DIRS "../components")
+set(EXTRA_COMPONENT_DIRS ${CMAKE_CURRENT_SOURCE_DIR}/../components ${CMAKE_CURRENT_SOURCE_DIR}/../esp-aws-iot)
 
 # Set the components to include the tests for.
 # This can be overriden from CMake cache:

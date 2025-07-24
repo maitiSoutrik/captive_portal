@@ -40,6 +40,12 @@ idf.py -p PORT flash monitor
 
 See the Getting Started Guide for full steps to configure and use ESP-IDF to build projects.
 
+## AWS IoT Integration
+
+This project includes a component for connecting to AWS IoT Core, allowing the device to send data and receive commands securely. For a complete guide on how to create the necessary AWS resources and configure the device certificates, please see the detailed setup document:
+
+**[AWS IoT Core Setup Guide](./docs/aws_iot_setup.md)**
+
 ## Example Output
 
 ```

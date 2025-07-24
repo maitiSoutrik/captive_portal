@@ -139,6 +139,13 @@ esp_err_t app_wifi_disconnect_sta(void);
  */
 esp_err_t app_wifi_get_current_sta_ssid(char *ssid_buffer, size_t buffer_len);
 
+/**
+ * @brief Get the RSSI of the connected WiFi network.
+ *
+ * @return int8_t The RSSI value, or 0 if not connected.
+ */
+int8_t app_wifi_get_rssi(void);
+
 #ifdef __cplusplus
 }
 #endif

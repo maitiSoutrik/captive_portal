@@ -17,6 +17,7 @@
 #include "esp_event.h"
 
 // Component includes
+#include "aws_iot.h"
 #include "app_wifi.h"
 #include "app_time_sync.h"
 #include "app_local_server.h"
@@ -40,7 +41,6 @@ static void time_sync_callback(app_time_sync_status_t status, time_t current_tim
 
 void app_main(void)
 {
-    rgb_led_wifi_app_started();
     ESP_LOGI(TAG, "Starting Captive Portal Application");
 
     /* Initialize core systems */
@@ -65,6 +65,7 @@ void app_main(void)
 
     ESP_LOGI(TAG, "Initializing DHT22 Sensor");
     ESP_ERROR_CHECK(dht22_init());
+
     
     /* Test storage functionality */
     // ESP_LOGI(TAG, "Testing SPI FFS storage");
@@ -103,7 +104,6 @@ void app_main(void)
     /* Start DNS server */
     ESP_LOGI(TAG, "Starting DNS server");
     ESP_ERROR_CHECK(start_dns_server());
-    rgb_led_http_server_started();
     
     /* Log startup completion */
     // AP IP logging removed as app_wifi_get_ap_ip was removed. 
@@ -144,12 +144,11 @@ static void wifi_event_callback(app_wifi_status_t status, void *user_data)
         case APP_WIFI_STATUS_CONNECTED:
             {
                 ESP_LOGI(TAG, "WiFi station connected successfully");
-                rgb_led_wifi_connected();
                 // STA IP is logged by app_wifi component on IP_EVENT_STA_GOT_IP.
                 // Number of connected stations logging removed as app_wifi_get_connected_stations was removed.
             }
             break;
-           
+            
         case APP_WIFI_STATUS_DISCONNECTED:
             ESP_LOGI(TAG, "WiFi station disconnected");
             break;
@@ -186,6 +185,13 @@ static void time_sync_callback(app_time_sync_status_t status, time_t current_tim
                 localtime_r(&current_time, &timeinfo);
                 strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
                 ESP_LOGI(TAG, "Current local time: %s", strftime_buf);
+                esp_err_t aws_status = aws_iot_start();
+                if (aws_status != ESP_OK) {
+                    ESP_LOGE(TAG, "AWS IoT initialization failed (err=0x%x)", aws_status);
+                    // Take corrective action or exit if necessary
+                    // For now, abort the application
+                    abort();
+                }
             }
             break;
             
