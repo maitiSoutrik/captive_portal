@@ -185,7 +185,13 @@ static void time_sync_callback(app_time_sync_status_t status, time_t current_tim
                 localtime_r(&current_time, &timeinfo);
                 strftime(strftime_buf, sizeof(strftime_buf), "%c", &timeinfo);
                 ESP_LOGI(TAG, "Current local time: %s", strftime_buf);
-                aws_iot_start();
+                esp_err_t aws_status = aws_iot_start();
+                if (aws_status != ESP_OK) {
+                    ESP_LOGE(TAG, "AWS IoT initialization failed (err=0x%x)", aws_status);
+                    // Take corrective action or exit if necessary
+                    // For now, abort the application
+                    abort();
+                }
             }
             break;
             

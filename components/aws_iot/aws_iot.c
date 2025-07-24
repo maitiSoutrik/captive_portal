@@ -204,7 +204,7 @@ void aws_iot_task(void *param) {
         // paramsQOS0.payloadLen = strlen(cPayload);
         // rc = aws_iot_mqtt_publish(&client, TOPIC, TOPIC_LEN, &paramsQOS0);
 
-        sprintf(cPayload, "{\"temperature\": %.1f, \"humidity\": %.1f}", dht22_get_temperature(), dht22_get_humidity());
+        snprintf(cPayload, sizeof(cPayload), "{\"temperature\": %.1f, \"humidity\": %.1f}", dht22_get_temperature(), dht22_get_humidity());
         paramsQOS1.payloadLen = strlen(cPayload);
         rc = aws_iot_mqtt_publish(&client, TOPIC, TOPIC_LEN, &paramsQOS1);
         if (rc == MQTT_REQUEST_TIMEOUT_ERROR) {
@@ -217,10 +217,15 @@ void aws_iot_task(void *param) {
     abort();
 }
 
-void aws_iot_start(void)
+esp_err_t aws_iot_start(void)
 {
-	if (task_aws_iot == NULL)
-	{
-		xTaskCreatePinnedToCore(&aws_iot_task, "aws_iot_task", AWS_IOT_TASK_STACK_SIZE, NULL, AWS_IOT_TASK_PRIORITY, &task_aws_iot, AWS_IOT_TASK_CORE_ID);
-	}
+    if (task_aws_iot == NULL)
+    {
+        BaseType_t task_result = xTaskCreatePinnedToCore(&aws_iot_task, "aws_iot_task", AWS_IOT_TASK_STACK_SIZE, NULL, AWS_IOT_TASK_PRIORITY, &task_aws_iot, AWS_IOT_TASK_CORE_ID);
+        if (task_result != pdPASS) {
+            ESP_LOGE(TAG, "Failed to create aws_iot_task");
+            return ESP_FAIL;
+        }
+    }
+    return ESP_OK;
 }
