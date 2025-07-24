@@ -137,7 +137,8 @@ void aws_iot_task(void *param) {
     rc = aws_iot_mqtt_init(&client, &mqttInitParams);
     if(SUCCESS != rc) {
         ESP_LOGE(TAG, "aws_iot_mqtt_init returned error : %d ", rc);
-        abort();
+        vTaskDelete(NULL);
+        return;
     }
 
     connectParams.keepAliveIntervalInSec = 10;

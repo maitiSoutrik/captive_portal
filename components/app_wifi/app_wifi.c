@@ -601,7 +601,7 @@ int8_t app_wifi_get_rssi(void)
         }
         ESP_LOGE(TAG, "Failed to get AP info: %s", esp_err_to_name(ret));
     }
-    return 0;
+    return INT8_MIN;
 }
 
 /* Private function implementations */
