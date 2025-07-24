@@ -65,3 +65,31 @@ If you are using other AWS services, you might need to configure IAM policies fo
 ## 4. Next Steps
 
 With the "Thing" created and certificates downloaded, you can now configure your ESP32 device to connect to AWS IoT Core using these credentials. You will need to embed the certificates into your firmware or store them in a secure way on the device.
+
+## 5. Place Certificates in the Project
+
+The project is configured to look for the certificate files in a specific location, but this location is intentionally excluded from version control by `.gitignore` to keep your credentials secure.
+
+1.  **Create the `certs` directory**:
+    Inside the project, navigate to the `components/aws_iot/` directory and create a new folder named `certs`. The final path will be `components/aws_iot/certs/`.
+
+2.  **Rename and Move Your Certificates**:
+    You must rename the files you downloaded from AWS and move them into the new `certs` directory. The project expects the following filenames:
+    *   Rename your **Device certificate** (`...-certificate.pem.crt`) to `certificate_pem_crt`.
+    *   Rename your **Private key file** (`...-private.pem.key`) to `private_pem_key`.
+    *   Rename your **Root CA certificate** (e.g., `AmazonRootCA1.pem`) to `aws_root_ca_pem`.
+
+3.  **Verify the Final Structure**:
+    After moving the files, your directory structure should look like this:
+
+    ```
+    captive_portal/
+    └── components/
+        └── aws_iot/
+            └── certs/
+                ├── aws_root_ca_pem
+                ├── certificate_pem_crt
+                └── private_pem_key
+    ```
+
+Once these files are in place, you can build and flash the project. The build system will automatically find these certificates and embed them into the final firmware binary.
