@@ -22,6 +22,7 @@
 #include "lwip/sys.h"
 #include "nvs_storage.h"
 #include "nvs_flash.h" // Added for NVS error codes
+#include "esp_wifi_types.h"
 #include "app_wifi.h"
 #include "aws_iot.h"
 #include "rgb_led.h"
@@ -587,6 +588,22 @@ esp_err_t app_wifi_get_current_sta_ssid(char *ssid_buffer, size_t buffer_len)
     xSemaphoreGive(s_wifi_ctx.mutex);
     return ret;
 }
+
+int8_t app_wifi_get_rssi(void)
+{
+    if (s_wifi_ctx.sta_status == APP_WIFI_STATUS_CONNECTED)
+    {
+        wifi_ap_record_t ap_info;
+        esp_err_t ret = esp_wifi_sta_get_ap_info(&ap_info);
+        if (ret == ESP_OK)
+        {
+            return ap_info.rssi;
+        }
+        ESP_LOGE(TAG, "Failed to get AP info: %s", esp_err_to_name(ret));
+    }
+    return 0;
+}
+
 /* Private function implementations */
 
 static void wifi_event_handler(void *arg, esp_event_base_t event_base, int32_t event_id, void *event_data)
