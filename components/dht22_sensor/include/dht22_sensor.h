@@ -1,5 +1,5 @@
-#ifndef DHT22_H
-#define DHT22_H
+#ifndef COMPONENTS_DHT22_SENSOR_INCLUDE_DHT22_SENSOR_H_
+#define COMPONENTS_DHT22_SENSOR_INCLUDE_DHT22_SENSOR_H_
 
 #include "esp_err.h"
 
@@ -29,4 +29,4 @@ float dht22_get_temperature(void);
  */
 float dht22_get_humidity(void);
 
-#endif /* DHT22_H */
+#endif /* COMPONENTS_DHT22_SENSOR_INCLUDE_DHT22_SENSOR_H_ */
